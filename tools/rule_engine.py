@@ -11,11 +11,11 @@ class RuleMatch:
     flag: str
     reasoning: str
     confidence: float
-    signals: Dict[str, bool]  # Only matched signals (no global explosion)
+    signals: Dict[str, bool]
 
 
 # -----------------------------
-# Base + India Patterns (merged)
+# Risk Patterns (Global + India)
 # -----------------------------
 RISK_PATTERNS = [
 
@@ -48,7 +48,7 @@ RISK_PATTERNS = [
     },
 
     # -------------------------
-    # INFECTION / SEPSIS
+    # SEPSIS
     # -------------------------
     {
         "name": "Sepsis Risk",
@@ -99,33 +99,33 @@ RISK_PATTERNS = [
     },
 
     # -------------------------
-    # VECTOR-BORNE (India)
+    # VECTOR (India)
     # -------------------------
     {
         "name": "Dengue Warning Signs",
         "severity": "HIGH",
         "symptoms_any": ["fever", "high fever"],
         "warning_any": ["abdominal pain", "persistent vomiting", "bleeding gums", "nose bleed", "lethargy", "restlessness"],
-        "context_month": [6, 7, 8, 9, 10],
+        "context_month": [6, 7, 8, 9, 10],  # optional
         "weights": {"symptom": 2, "warning": 3, "season": 1},
         "min_required_weight": 4,
         "reasoning": "Fever + warning sign in monsoon",
     },
 
     # -------------------------
-    # TB (India)
+    # TB
     # -------------------------
     {
         "name": "Pulmonary TB Red Flag",
         "severity": "HIGH",
         "symptoms_any": ["chronic cough", "cough >2 weeks", "hemoptysis", "blood in sputum", "weight loss", "night sweats"],
         "weights": {"symptom": 2},
-        "min_required_weight": 2,  # adjusted
+        "min_required_weight": 2,
         "reasoning": "Prolonged cough with systemic signs",
     },
 
     # -------------------------
-    # CARDIOVASCULAR
+    # HYPERTENSION
     # -------------------------
     {
         "name": "Hypertensive Emergency",
@@ -165,7 +165,7 @@ RISK_PATTERNS = [
     },
 
     # -------------------------
-    # ENVIRONMENTAL
+    # ENVIRONMENT
     # -------------------------
     {
         "name": "Heat Stroke",
@@ -189,6 +189,37 @@ RISK_PATTERNS = [
         "min_required_weight": 3,
         "reasoning": "Pregnant + bleeding or pain",
     },
+
+    # -------------------------
+    # DRUG INTERACTIONS
+    # -------------------------
+    {
+        "name": "Bleeding Risk",
+        "severity": "HIGH",
+        "meds_any": ["warfarin"],
+        "meds_all": ["clarithromycin", "fluconazole", "metronidazole"],
+        "weights": {"med": 3},
+        "min_required_weight": 3,
+        "reasoning": "Warfarin + interacting drug",
+    },
+    {
+        "name": "Hepatotoxicity Risk",
+        "severity": "HIGH",
+        "meds_any": ["paracetamol", "acetaminophen"],
+        "habits_any": ["heavy alcohol", "binge drinking"],
+        "weights": {"med": 2, "habit": 2},
+        "min_required_weight": 3,
+        "reasoning": "Paracetamol + alcohol",
+    },
+    {
+        "name": "Respiratory Depression Risk",
+        "severity": "HIGH",
+        "meds_any": ["opioid", "morphine", "fentanyl", "oxycodone"],
+        "meds_all": ["benzodiazepine", "diazepam", "alprazolam"],
+        "weights": {"med": 3},
+        "min_required_weight": 3,
+        "reasoning": "Opioid + benzodiazepine",
+    },
 ]
 
 
@@ -208,7 +239,7 @@ def match_all(text_list, keywords):
 
 
 # -----------------------------
-# Pattern Evaluation
+# Evaluator
 # -----------------------------
 def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
 
@@ -216,6 +247,7 @@ def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
     medications = data["medications"]
     habits = data["habits"]
     conditions = data["conditions"]
+    vitals = data.get("vitals", [])
     age = data["age"]
     month = data.get("month")
 
@@ -223,32 +255,36 @@ def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
     total_weight = sum(pattern.get("weights", {}).values())
     signals = {}
 
-    # ---- symptoms ----
+    # symptoms
     if "symptoms_any" in pattern and match_any(symptoms, pattern["symptoms_any"]):
         matched_weight += pattern["weights"].get("symptom", 0)
         signals["symptom"] = True
 
-    # ---- conditions ----
+    # conditions
     if "conditions_any" in pattern and match_any(conditions, pattern["conditions_any"]):
         matched_weight += pattern["weights"].get("condition", 0)
         signals["condition"] = True
 
-    # ---- habits ----
+    # habits
     if "habits_any" in pattern and match_any(habits, pattern["habits_any"]):
         matched_weight += pattern["weights"].get("habit", 0)
         signals["habit"] = True
 
-    # ---- meds ----
+    # meds
     if "meds_any" in pattern and match_any(medications, pattern["meds_any"]):
         matched_weight += pattern["weights"].get("med", 0)
         signals["med"] = True
 
-    # ---- vitals ----
-    if "vitals_any" in pattern and match_any(symptoms, pattern["vitals_any"]):
+    if "meds_all" in pattern and match_all(medications, pattern["meds_all"]):
+        matched_weight += pattern["weights"].get("med", 0)
+        signals["med"] = True
+
+    # vitals (separate field)
+    if "vitals_any" in pattern and match_any(vitals, pattern["vitals_any"]):
         matched_weight += pattern["weights"].get("vital", 0)
         signals["vital"] = True
 
-    # ---- signs / warnings ----
+    # signs / warnings
     if "signs_any" in pattern and match_any(symptoms, pattern["signs_any"]):
         matched_weight += pattern["weights"].get("sign", 0)
         signals["sign"] = True
@@ -257,12 +293,12 @@ def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
         matched_weight += pattern["weights"].get("warning", 0)
         signals["warning"] = True
 
-    # ---- exposure ----
+    # exposure
     if "exposure_any" in pattern and match_any(symptoms + habits, pattern["exposure_any"]):
         matched_weight += pattern["weights"].get("exposure", 0)
         signals["exposure"] = True
 
-    # ---- age ----
+    # age
     if "age_min" in pattern and age and age >= pattern["age_min"]:
         matched_weight += pattern["weights"].get("age", 0)
         signals["age"] = True
@@ -271,29 +307,30 @@ def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
         matched_weight += pattern["weights"].get("age", 0)
         signals["age"] = True
 
-    # ---- altered mental ----
+    # altered mental
     if pattern.get("altered_mental"):
         if match_any(symptoms, ["confusion", "drowsy", "altered"]):
             matched_weight += pattern["weights"].get("mental", 0)
             signals["mental"] = True
 
-    # ---- onset ----
+    # onset
     if pattern.get("onset") == "sudden":
         if match_any(symptoms, ["sudden", "suddenly"]):
             matched_weight += pattern["weights"].get("onset", 0)
             signals["onset"] = True
 
-    # ---- seasonal ----
+    # seasonal (optional)
+    # if month not provided → skipped intentionally (no penalty)
     if "context_month" in pattern and month:
         if month in pattern["context_month"]:
             matched_weight += pattern["weights"].get("season", 0)
             signals["season"] = True
 
-    # ---- threshold ----
+    # threshold
     if matched_weight < pattern.get("min_required_weight", 1):
         return None
 
-    # ---- confidence ----
+    # confidence
     base_conf = matched_weight / total_weight if total_weight else 0
 
     missing = 0
@@ -317,7 +354,7 @@ def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
 
 
 # -----------------------------
-# Main entry
+# Main Function
 # -----------------------------
 def run_hard_rules(structured_input: Dict) -> List[RuleMatch]:
 
@@ -326,6 +363,7 @@ def run_hard_rules(structured_input: Dict) -> List[RuleMatch]:
         "medications": normalize_list(structured_input.get("medications", [])),
         "habits": normalize_list(structured_input.get("habits", [])),
         "conditions": normalize_list(structured_input.get("conditions", [])),
+        "vitals": normalize_list(structured_input.get("vitals", [])),  # NEW
         "age": structured_input.get("age", 0),
         "month": structured_input.get("month"),  # optional
     }
