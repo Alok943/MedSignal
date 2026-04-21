@@ -61,7 +61,7 @@ SEVERITY: ● CRITICAL
 
 RED FLAGS
 🔴 Probable ACS — chest pain + diabetes + 20yr smoker pattern
-🔴 Possible drug interaction — BP med + antibiotic (class unknown, high risk)
+🔴 Possible drug interaction — warfarin + antibiotic (rule + OpenFDA)
 🟡 Missing medication data — conservative risk assessment applied
 🟡 No prior records — actual risk may be understated
 
@@ -138,16 +138,24 @@ All five agents run on the **same model** — Llama 3 via AMD Developer Cloud. W
 
 MedSignal does **not** rely purely on LLMs. It combines three layers for reliability:
 
-### Layer 1 — Hard Rules (fast, deterministic)
-```
-chest pain + diabetes + age > 50 + smoking       → CRITICAL: ACS
-MAOI + any serotonergic medication               → CRITICAL: Serotonin syndrome
-warfarin + clarithromycin / fluconazole          → HIGH: Bleeding risk
-paracetamol + heavy alcohol use                  → HIGH: Hepatotoxicity
-fever + confusion + neck stiffness               → CRITICAL: Meningitis
-corticosteroid use + fever + hypotension         → CRITICAL: Adrenal crisis
-opioid + benzodiazepine                          → HIGH: Respiratory depression
-```
+### Layer 1 — Pattern-Based Risk Engine (fast, deterministic)
+
+MedSignal uses a **weighted risk pattern system** instead of rigid rules.
+
+Each pattern:
+- Combines symptoms, conditions, habits, **vitals**, and context
+- Uses clinical weights (not all signals are equal)
+- Triggers only if a minimum threshold is met
+- Outputs a confidence score (0.3–1.0)
+
+Example:
+chest pain + diabetes → CRITICAL  
+fever + confusion + neck stiffness → CRITICAL  
+
+Drug interaction patterns:
+warfarin + interacting drugs (e.g., clarithromycin, fluconazole) → HIGH: bleeding risk  
+opioid + benzodiazepine → HIGH: respiratory depression  
+paracetamol + heavy alcohol use → HIGH: hepatotoxicity
 
 ### Layer 2 — OpenFDA API (real data grounding)
 Drug interaction labels pulled live from the FDA database. Prevents hallucinated drug information. Adds "FDA confirmed" credibility to every drug-related flag.
@@ -187,8 +195,8 @@ This is the connection a tired doctor at patient #75 might miss. MedSignal catch
 | Compute | AMD Instinct MI300X |
 | Drug Data | OpenFDA API (free, no auth) |
 | Backend | FastAPI |
-| Frontend | Streamlit |
-| Deployment | HuggingFace Spaces (Docker) |
+| Frontend | React (Vite) |
+| Deployment | Vercel (frontend) + HuggingFace Spaces Docker (backend) || Deployment | HuggingFace Spaces (Docker) |
 
 ---
 
@@ -204,13 +212,19 @@ medsignal/
 │   └── summary_agent.py         # Final report assembly
 ├── tools/
 │   ├── openfda_tool.py          # OpenFDA API wrapper
-│   └── rule_engine.py           # 7 hard clinical rules
+│   └── rule_engine.py           #  pattern-based clinical risk engine
 ├── crew/
 │   └── medsignal_crew.py        # CrewAI crew + parallel config
 ├── api/
 │   └── main.py                  # FastAPI endpoints
-├── app/
-│   └── streamlit_app.py         # Frontend UI
+├── frontend/
+│   ├── src/
+│   │   ├── components/          # UI components
+│   │   ├── pages/               # Route pages
+│   │   └── main.jsx             # Entry point
+│   ├── public/
+│   ├── index.html
+│   └── package.json
 ├── demo/
 │   └── cases.py                 # 5 synthetic demo cases
 ├── tests/
@@ -255,7 +269,9 @@ cp .env.example .env
 uvicorn api.main:app --reload
 
 # Run frontend (new terminal)
-streamlit run app/streamlit_app.py
+cd frontend
+npm install
+npm run dev
 ```
 
 ---
