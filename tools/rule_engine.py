@@ -197,7 +197,7 @@ RISK_PATTERNS = [
         "name": "Bleeding Risk",
         "severity": "HIGH",
         "meds_any": ["warfarin"],
-        "meds_all": ["clarithromycin", "fluconazole", "metronidazole"],
+        "meds_co": ["clarithromycin", "fluconazole", "metronidazole"],
         "weights": {"med": 3},
         "min_required_weight": 3,
         "reasoning": "Warfarin + interacting drug",
@@ -215,7 +215,7 @@ RISK_PATTERNS = [
         "name": "Respiratory Depression Risk",
         "severity": "HIGH",
         "meds_any": ["opioid", "morphine", "fentanyl", "oxycodone"],
-        "meds_all": ["benzodiazepine", "diazepam", "alprazolam"],
+        "meds_co": ["benzodiazepine", "diazepam", "alprazolam"],
         "weights": {"med": 3},
         "min_required_weight": 3,
         "reasoning": "Opioid + benzodiazepine",
@@ -274,6 +274,14 @@ def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
     if "meds_any" in pattern and match_any(medications, pattern["meds_any"]):
         matched_weight += pattern["weights"].get("med", 0)
         signals["med"] = True
+    
+    # co-medication (any of meds_any AND any of meds_co both present)
+    if "meds_co" in pattern:
+        if signals.get("med") and match_any(medications, pattern["meds_co"]):
+            signals["med_co"] = True
+        elif "meds_co" in pattern:
+        # meds_any didn't match, skip
+            pass
 
     if "meds_all" in pattern and match_all(medications, pattern["meds_all"]):
         matched_weight += pattern["weights"].get("med", 0)
@@ -326,6 +334,10 @@ def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
             matched_weight += pattern["weights"].get("season", 0)
             signals["season"] = True
 
+    if "meds_co" in pattern and not signals.get("med_co"):
+        matched_weight -= pattern["weights"].get("med", 0)
+        signals.pop("med", None)
+    
     # threshold
     if matched_weight < pattern.get("min_required_weight", 1):
         return None
