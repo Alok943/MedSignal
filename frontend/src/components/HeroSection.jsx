@@ -15,8 +15,8 @@ export default function HeroSection() {
           </h1>
           <div>
             <p className="font-body-strong text-body-strong text-tertiary-fixed-dim max-w-lg border-l-2 border-[#ED1C24] pl-4 mb-4">
-    Missed life-threatening conditions like heart attacks or major
-    blood vessel tears can be fatal within hours.<br />
+     {/*CHANGED: replaced niche condition with common, relatable emergencies*/}
+Missed heart attacks, strokes, or severe infections can be fatal within hours.<br />
     MedSignal detects critical patterns in real-time &mdash; before it&apos;s too late.
             </p>
             <p className="font-body-main text-sm text-tertiary-fixed-dim opacity-80 pl-4">

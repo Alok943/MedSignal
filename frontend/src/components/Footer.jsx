@@ -7,8 +7,13 @@ export default function Footer() {
         © 2026 MEDSIGNAL TACTICAL AI - AMD HACKATHON PROTOCOL
       </div>
       <div className="flex flex-wrap justify-center gap-4 md:gap-6">
-        {['GitHub Repository', 'Documentation', 'System Status', 'Privacy Log'].map((link) => (
-          <a key={link} className="font-['JetBrains_Mono'] text-[10px] tracking-tight text-[#7a90b0] hover:text-white transition-colors uppercase" href="#">
+        <a href="https://github.com/Alok943/MedSignal" target="_blank" rel="noreferrer"
+          className="font-['JetBrains_Mono'] text-[10px] tracking-tight text-[#7a90b0] hover:text-white transition-colors uppercase">
+          GitHub Repository
+        </a>
+        {['Documentation', 'System Status', 'Privacy Log'].map((link) => (
+          <a key={link} href="#"
+            className="font-['JetBrains_Mono'] text-[10px] tracking-tight text-[#7a90b0] hover:text-white transition-colors uppercase">
             {link}
           </a>
         ))}

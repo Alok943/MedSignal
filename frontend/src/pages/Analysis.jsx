@@ -224,7 +224,7 @@ export default function Analysis() {
           </div>
 
           {/* DDx Table */}
-          <div className="panel" style={{ padding:'16px', borderLeft:'2px solid rgba(122,144,176,0.3)' }}>
+          <div className="panel" style={{ padding:'16px' }}>
             <div className="label-caps" style={{ color:'#8991a2', marginBottom:'16px',
               display:'flex', alignItems:'center', gap:'6px' }}>
               <span className="material-symbols-outlined" style={{ fontSize:'13px' }}>format_list_numbered</span>
@@ -234,12 +234,9 @@ export default function Analysis() {
               fontFamily:"'JetBrains Mono',monospace", fontSize:'13px' }}>
               <thead>
                 <tr>
-                  {['RNK','Condition & Reasoning','Probability','Action'].map((h, i) => (
-                    <th key={h} style={{ textAlign: i >= 2 ? 'right' : 'left',
-                      padding:'4px 8px',
-                      paddingLeft: i === 0 ? '12px' : '8px',
-                      color:'#8991a2', fontWeight:700, fontSize:'10px',
-                      letterSpacing:'0.1em', textTransform:'uppercase',
+                  {['RNK','Condition & Reasoning','Probability','Action'].map(h => (
+                    <th key={h} style={{ textAlign:'left', padding:'4px 8px', color:'#8991a2',
+                      fontWeight:700, fontSize:'10px', letterSpacing:'0.1em', textTransform:'uppercase',
                       borderBottom:'1px solid rgba(31,54,81,0.8)' }}>{h}</th>
                   ))}
                 </tr>
@@ -247,8 +244,7 @@ export default function Analysis() {
               <tbody>
                 {r.differential?.map(d => (
                   <tr key={d.rank} style={{ background:'rgba(31,54,81,0.12)' }}>
-                    <td style={{ padding:'16px 8px', paddingLeft:'8px',
-                      borderLeft:`4px solid ${d.border}`,
+                    <td style={{ padding:'16px 8px', borderLeft:`4px solid ${d.border}`,
                       fontWeight:700, color:d.border }}>{d.rank}</td>
                     <td style={{ padding:'16px 8px' }}>
                       <div style={{ fontWeight:700, fontSize:'14px', color:'var(--text)' }}>{d.condition}</div>

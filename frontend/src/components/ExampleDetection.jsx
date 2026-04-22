@@ -21,7 +21,8 @@ export default function ExampleDetection() {
           <div className="font-label-caps text-tertiary-fixed-dim mb-2 uppercase">Output</div>
           <div className="font-data-mono text-[#ED1C24] bg-[#ED1C24]/10 p-3 rounded-sm border border-[#ED1C24]/30 flex items-center gap-2">
             <span className="material-symbols-outlined text-[18px]">warning</span>
-            🚨 Possible major artery tear (Aortic Dissection)
+           {/* 🚨  CHANGED: replaced complex diagnosis with intuitive one */}
+            🚨 Probable Heart Attack (Acute Coronary Syndrome)
           </div>
         </div>
         <div className="hidden md:flex text-tertiary-fixed-dim">
