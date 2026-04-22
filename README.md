@@ -1,4 +1,6 @@
-<img src="assets/banner.png" alt="AlertNet AI Banner" width="800"/>
+<img width="1983" height="793" alt="ChatGPT Image Apr 22, 2026, 02_21_26 AM" src="https://github.com/user-attachments/assets/6772588e-b764-4cca-8637-172cad44af06" />
+
+
 # 🏥 MedSignal
 ### High-Performance Multi-Agent Clinical Risk Detection System
 
