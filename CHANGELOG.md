@@ -15,3 +15,11 @@
 - Hindi negation support
 - Markdown fence stripping for LLM output
 - External mappings.json for term normalization
+
+## ddx_agent
+- Pydantic output schema with soft reasoning truncation
+- allowed_keys filter — strips irrelevant intake fields
+- Dict-based result cache with version key
+- Balanced prompt compression ~290 tokens
+- priority_hint support for rule engine seeding
+- parse_ddx_safe fallback parser
