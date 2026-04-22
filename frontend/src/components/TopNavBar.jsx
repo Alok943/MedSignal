@@ -5,7 +5,7 @@ const NAV_LINKS = [
   { label: 'Dashboard',   to: '/' },
   { label: 'Diagnostics', to: '/analysis' },
   { label: 'Demo Cases',  to: '/demo' },
-  { label: 'Agents',      to: '#' },
+  { label: 'Agents',      to: '/agents' },
   { label: 'Telemetry',   to: '#' },
 ];
 

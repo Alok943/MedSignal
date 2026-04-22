@@ -1,7 +1,63 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@theme {
+  /* Colors */
+  --color-surface-container-lowest: #000f22;
+  --color-surface-container-low: #021c37;
+  --color-surface-container: #06203b;
+  --color-surface-container-high: #132b46;
+  --color-surface-container-highest: #1f3651;
+  --color-surface-dim: #00142a;
+  --color-surface: #00142a;
+  --color-surface-bright: #243a56;
+  --color-surface-variant: #1f3651;
+  --color-on-surface: #d3e4ff;
+  --color-on-surface-variant: #e8bcb7;
+  --color-background: #00142a;
+  --color-on-background: #d3e4ff;
+  --color-primary: #ffb4ab;
+  --color-primary-container: #ff544b;
+  --color-primary-fixed-dim: #ffb4ab;
+  --color-on-primary-fixed-variant: #93000d;
+  --color-inverse-primary: #c00014;
+  --color-secondary: #a2e7ff;
+  --color-secondary-container: #00d2fd;
+  --color-secondary-fixed: #b4ebff;
+  --color-secondary-fixed-dim: #3cd7ff;
+  --color-tertiary: #bec7d9;
+  --color-tertiary-container: #8991a2;
+  --color-tertiary-fixed: #dae3f6;
+  --color-tertiary-fixed-dim: #bec7d9;
+  --color-on-tertiary-fixed-variant: #3f4756;
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+  --color-outline: #ae8783;
+  --color-outline-variant: #5e3f3c;
+  --color-warning: #fbbf24;
+  --color-caution: #f97316;
 
+  /* Fonts */
+  --font-display-lg: "Space Grotesk", sans-serif;
+  --font-h1: "Space Grotesk", sans-serif;
+  --font-h2: "Space Grotesk", sans-serif;
+  --font-body-main: "Inter", sans-serif;
+  --font-body-strong: "Inter", sans-serif;
+  --font-data-mono: "JetBrains Mono", monospace;
+  --font-label-caps: "JetBrains Mono", monospace;
+
+  /* Font sizes */
+  --text-display-lg: 48px;
+  --text-h1: 32px;
+  --text-h2: 24px;
+  --text-body-main: 16px;
+  --text-body-strong: 16px;
+  --text-data-mono: 14px;
+  --text-label-caps: 11px;
+
+  /* Spacing */
+  --spacing-gutter: 16px;
+  --spacing-margin: 24px;
+  --spacing-container-max: 1440px;
+}
 @layer base {
   body {
     @apply bg-[#050d1a] text-[#d3e4ff] antialiased;
