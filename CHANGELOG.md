@@ -9,3 +9,9 @@
 - Integrated India-specific clinical patterns (dengue, TB, poisoning, etc.)
 - Added key drug interaction rules (warfarin, paracetamol, opioid combinations)
 - Improved explainability via signal-level outputs
+
+## intake_agent
+- Full pipeline: LLM → Pydantic → negation → normalization → timeline → quality scoring
+- Hindi negation support
+- Markdown fence stripping for LLM output
+- External mappings.json for term normalization

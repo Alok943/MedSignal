@@ -204,6 +204,8 @@ This is the connection a tired doctor at patient #75 might miss. MedSignal catch
 
 ```
 medsignal/
+├── data/
+│   └── mappings.json            # Hindi-English clinical term normalization
 ├── agents/
 │   ├── intake_agent.py          # Raw text → structured JSON
 │   ├── ddx_agent.py             # Differential diagnosis
@@ -308,7 +310,7 @@ print(response.json())
 | Generic chatbot output | Structured, severity-ranked report |
 | Assumes structured records | Works with zero prior history |
 | LLM-only, hallucination-prone | Hybrid: rules + OpenFDA + LLM |
-| English-only structured input | Handles noisy, informal, real-world input |
+| English-only input | Hindi + English mixed input supported | Handles noisy, informal, real-world input |
 
 ---
 
