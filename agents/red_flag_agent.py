@@ -4,6 +4,8 @@ from typing import List, Literal, Dict, Any
 from textwrap import dedent
 import json
 import re
+import logging
+logger = logging.getLogger(__name__)
 
 from typing import Optional
 from tools.rule_engine import RuleMatch
@@ -36,8 +38,10 @@ class RedFlagOutput(BaseModel):
 
 RED_FLAG_TASK_PROMPT = dedent(
     """
-You are an emergency medicine specialist. Identify ONLY NEW clinical red flags.
-
+-You are an emergency medicine specialist. Identify ONLY NEW clinical red flags.
+- Hypoglycemia is MEDIUM unless confirmed neuro symptoms (confusion, seizure, LOC) present
+- Do NOT promote hypoglycemia to CRITICAL based on diabetes alone
+- ACS with chest pain + 2+ risk factors is always CRITICAL and overrides hypoglycemia priority
 PRE-VALIDATED FLAGS (DO NOT REPEAT OR MODIFY):
 {rule_matches}
 
@@ -54,19 +58,20 @@ TASK:
 4. DO NOT invent medications, symptoms, or history.
 5. Return ONLY valid JSON matching the schema.
 
+
 CONFIDENCE GUIDELINES:
 - LLM-derived flags: 0.60-0.80
 - Never exceed 0.80 for probabilistic reasoning.
 
 OUTPUT FORMAT:
-{
+{{
   "red_flags": [
-    {"severity": "HIGH", "flag": "...", "reasoning": "...", "source": "LLM", "confidence": 0.75}
+    {{"severity": "HIGH", "flag": "...", "reasoning": "...", "source": "LLM", "confidence": 0.75}}
   ],
   "overall_severity": "HIGH",
   "llm_flags_added": 1,
   "fda_confirmed_count": 0
-}
+}}
 """
 )
 
@@ -342,59 +347,81 @@ def get_red_flag_agent(llm) -> Agent:
 
 
 def _parse_red_flag_safe(raw: str, prefilled: List[dict]) -> RedFlagOutput:
-    # Clean markdown fences robustly
-    cleaned = re.sub(r"```(?:json)?|```", "", str(raw)).strip()
+    """Parse LLM red-flag JSON safely, merge with deterministic prefilled flags."""
+    # 1. Clean markdown fences and extract text
+    raw_text = getattr(raw, "raw", None) or getattr(raw, "output", None) or str(raw)
+    cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw_text).strip()
 
+    # 2. Safe JSON parse
     try:
         data = json.loads(cleaned)
     except Exception:
         data = {"red_flags": [], "llm_flags_added": 0, "fda_confirmed_count": 0}
 
-    # Merge prefilled deterministically
-    existing_flags = {f["flag"].lower() for f in data.get("red_flags", [])}
+    data.setdefault("red_flags", [])
+    data.setdefault("llm_flags_added", 0)
+    data.setdefault("fda_confirmed_count", 0)
+
+    # 3. Merge prefilled deterministically (prefilled always wins, goes first)
+    existing_flags = {f.get("flag", "").lower() for f in data["red_flags"]}
     for pf in prefilled:
-        if pf["flag"].lower() not in existing_flags:
+        if pf.get("flag", "").lower() not in existing_flags:
             data["red_flags"].insert(0, pf)
 
-    # Deduplicate
+    # 4. Deduplicate — robust key handles "Missing: Onset" vs "Missing onset..."
     seen = set()
-    unique = []
+    unique_flags = []
     for f in data["red_flags"]:
-        key = f["flag"].lower()
-        if key not in seen:
+        flag_text = f.get("flag", "")
+        key = re.sub(r"[^a-z]", "", flag_text.lower())[:30]
+        if key and key not in seen:
             seen.add(key)
-            unique.append(f)
-    data["red_flags"] = unique
+            unique_flags.append(f)
 
-    # Clamp LLM confidence & enforce bounds
+    # Consolidate missing data flags
+    missing_flags = [f for f in unique_flags if f.get("flag", "").lower().startswith("missing")]
+    other_flags = [f for f in unique_flags if not f.get("flag", "").lower().startswith("missing")]
+
+    if missing_flags:
+        combined_fields = set()
+        for f in missing_flags:
+            text = f.get("flag", "").lower()
+            if "onset" in text: combined_fields.add("onset")
+            if "duration" in text: combined_fields.add("duration")
+            if "vitals" in text: combined_fields.add("vitals")
+
+        if combined_fields:
+            other_flags.append({
+                "severity": "MEDIUM",
+            "flag": f"Missing key data ({', '.join(sorted(combined_fields))})",
+            "reasoning": "Critical clinical data absent for risk stratification",
+            "source": "RULE",
+            "confidence": 0.85
+        })
+
+    data["red_flags"] = other_flags
+
+    # 5. Clamp confidence and enforce bounds
     for f in data["red_flags"]:
+        conf = float(f.get("confidence", 0.5))
         if f.get("source") == "LLM":
-            f["confidence"] = max(0.60, min(0.80, float(f.get("confidence", 0.70))))
-        f["confidence"] = max(0.0, min(1.0, float(f.get("confidence", 0.5))))
+            conf = max(0.60, min(0.80, conf)) # LLM bounds
+        f["confidence"] = max(0.0, min(1.0, conf))
 
-    # Sort by severity
+    # 6. Sort by severity (deterministic)
     severity_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
-    data["red_flags"] = sorted(
-        data["red_flags"], key=lambda x: severity_order.get(x.get("severity", "LOW"), 4)
-    )
+    data["red_flags"].sort(key=lambda x: severity_order.get(x.get("severity", "LOW"), 4))
 
-    # Deterministic overall severity
-    data["overall_severity"] = (
-        data["red_flags"][0]["severity"] if data["red_flags"] else "LOW"
-    )
+    # 7. Compute overall severity and counts
+    data["overall_severity"] = data["red_flags"][0]["severity"] if data["red_flags"] else "LOW"
+    data["llm_flags_added"] = sum(1 for f in data["red_flags"] if f.get("source") == "LLM")
+    data["fda_confirmed_count"] = sum(1 for f in data["red_flags"] if "FDA" in f.get("source", ""))
 
-    # Compute counts
-    data["llm_flags_added"] = sum(
-        1 for f in data["red_flags"] if f.get("source") == "LLM"
-    )
-    data["fda_confirmed_count"] = sum(
-        1 for f in data["red_flags"] if "FDA" in f.get("source", "")
-    )
-
-    # Safe Pydantic validation
+    # 8. Validate with Pydantic, fallback to prefilled only
     try:
         return RedFlagOutput.model_validate(data)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[RED FLAG] LLM parse failed: {e}. Using prefilled only.")
         safe_flags = []
         for f in prefilled:
             try:
@@ -403,9 +430,9 @@ def _parse_red_flag_safe(raw: str, prefilled: List[dict]) -> RedFlagOutput:
                 continue
         return RedFlagOutput(
             red_flags=safe_flags,
-            overall_severity=data.get("overall_severity", "LOW"),
-            llm_flags_added=data.get("llm_flags_added", 0),
-            fda_confirmed_count=data.get("fda_confirmed_count", 0),
+            overall_severity=prefilled[0]["severity"] if prefilled else "LOW",
+            llm_flags_added=0,
+            fda_confirmed_count=sum(1 for f in prefilled if "FDA" in f.get("source", ""))
         )
 
 

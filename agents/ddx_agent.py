@@ -36,6 +36,9 @@ DDX_TASK_PROMPT = dedent("""
 Generate ranked differential diagnosis from structured patient data.
 
 RULES:
+- chest pain + any of (age>50, smoking, diabetes, hypertension) → ACS probability MUST be HIGH unless strong alternative diagnosis present
+- Never assign MEDIUM to ACS when 2+ cardiac risk factors present
+- Always return 3–5 diagnoses regardless of data quality
 - Rank by RISK = severity × probability. Life-threats first.
 - Severity: CRITICAL/HIGH/MODERATE/LOW (danger, not probability)
 - Probability: HIGH/MEDIUM/LOW (based ONLY on input data)
@@ -54,7 +57,7 @@ RULES:
 - Always return 1–5 diagnoses, ranks sequential from 1
 
 OUTPUT — valid JSON only, no markdown:
-{"differential":[{"rank":1,"condition":"...","severity":"...","probability":"...","reasoning":"symptoms:chest pain + conditions:diabetes"}],"ddx_confidence":"...","ddx_notes":"...","missing_critical_data":[...]}
+{{"differential":[{{"rank":1,"condition":"...","severity":"...","probability":"...","reasoning":"symptoms:chest pain + conditions:diabetes"}}],"ddx_confidence":"...","ddx_notes":"...","missing_critical_data":[...]}}
 
 Input:
 {structured_input}
@@ -133,17 +136,16 @@ def build_ddx_task(agent: Agent, structured_input: dict) -> Task:
 # Safe Parser
 # =============================
 
-def parse_ddx_safe(raw: str) -> DDxOutput:
+def parse_ddx_safe(raw) -> DDxOutput:
+    raw_text = getattr(raw, "raw", None) or getattr(raw, "output", None) or str(raw)
+    cleaned = re.sub(r"```(?:json)?|```", "", raw_text).strip()
     try:
-        return DDxOutput(**json.loads(raw))
+        return DDxOutput(**json.loads(cleaned))
     except:
-        cleaned = re.sub(r"```(?:json)?|```", "", str(raw)).strip()
         data = json.loads(cleaned)
-
         for item in data.get("differential", []):
             if len(item.get("reasoning", "")) > 140:
                 item["reasoning"] = item["reasoning"][:140]
-
         return DDxOutput(**data)
 
 

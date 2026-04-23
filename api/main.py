@@ -21,81 +21,44 @@ logging.basicConfig(level=logging.INFO)
 # LLM Setup (AMD Developer Cloud)
 # =============================
 from functools import lru_cache
+from crewai import LLM
 
 @lru_cache(maxsize=1)
-
-
 def get_llm():
-    provider = os.getenv("LLM_PROVIDER", "google")
+    provider = os.getenv("LLM_PROVIDER", "groq")
 
-    # ───────── GOOGLE (Gemini) ─────────
-    if provider == "google":
-        from langchain_google_genai import ChatGoogleGenerativeAI
-
-        api_key = os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            raise ValueError("GOOGLE_API_KEY not set")
-
-        model = os.getenv("GOOGLE_MODEL", "gemini-1.5-flash")
-
-        return ChatGoogleGenerativeAI(
-            model=model,
-            google_api_key=api_key,
+    if provider == "groq":
+        return LLM(
+            model=f"groq/{os.getenv('GROQ_MODEL', 'llama3-70b-8192')}",
+            api_key=os.getenv("GROQ_API_KEY"),
             temperature=0.1,
+            max_tokens=1024,
         )
 
-    # ───────── GROQ ─────────
-    elif provider == "groq":
-        from langchain_openai import ChatOpenAI
-
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise ValueError("GROQ_API_KEY not set")
-
-        model = os.getenv("GROQ_MODEL", "llama3-70b-8192")
-        base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
-
-        return ChatOpenAI(
-            model=model,
-            api_key=SecretStr(api_key),
-            base_url=base_url,
+    elif provider == "google":
+        return LLM(
+            model=f"gemini/{os.getenv('GOOGLE_MODEL', 'gemini-1.5-flash')}",
+            api_key=os.getenv("GOOGLE_API_KEY"),
             temperature=0.1,
+            max_tokens=1024,
         )
 
-    # ───────── AMD ─────────
     elif provider == "amd":
-        from langchain_openai import ChatOpenAI
-
-        api_key = os.getenv("AMD_API_KEY")
-        if not api_key:
-            raise ValueError("AMD_API_KEY not set")
-
-        model = os.getenv("AMD_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
-        base_url = os.getenv("AMD_API_BASE", "https://api.inference.amd.com/v1")
-
-        return ChatOpenAI(
-            model=model,
-            api_key=SecretStr(api_key),
-            base_url=base_url,
+        return LLM(
+            model=f"openai/{os.getenv('AMD_MODEL', 'meta-llama/Llama-3.1-8B-Instruct')}",
+            api_key=os.getenv("AMD_API_KEY"),
+            base_url=os.getenv("AMD_API_BASE", "https://api.inference.amd.com/v1"),
             temperature=0.1,
+            max_tokens=1024,
         )
 
-    # ───────── LIGHTNING AI ─────────
     elif provider == "lightning":
-        from langchain_openai import ChatOpenAI
-
-        api_key = os.getenv("LIGHTNING_API_KEY")
-        if not api_key:
-            raise ValueError("LIGHTNING_API_KEY not set")
-
-        model = os.getenv("LIGHTNING_MODEL", "gemma")
-        base_url = os.getenv("LIGHTNING_BASE_URL", "https://your-lightning-endpoint")
-
-        return ChatOpenAI(
-            model=model,
-            api_key=SecretStr(api_key),
-            base_url=base_url,
+        return LLM(
+            model=f"openai/{os.getenv('LIGHTNING_MODEL', 'gemma')}",
+            api_key=os.getenv("LIGHTNING_API_KEY"),
+            base_url=os.getenv("LIGHTNING_API_BASE"),
             temperature=0.1,
+            max_tokens=1024,
         )
 
     else:
@@ -249,7 +212,15 @@ async def analyze_case(request: CaseRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"API error: {e}")
+        msg = str(e)
+        logger.error(f"API error: {msg}")
+    
+    # surface provider overload cleanly
+        if "503" in msg or "UNAVAILABLE" in msg or "high demand" in msg:
+            raise HTTPException(
+                status_code=503, 
+                detail="LLM provider overloaded. Retry in 10s or set LLM_PROVIDER=groq in .env"
+        )
         raise HTTPException(status_code=500, detail="Internal processing error")
 
 

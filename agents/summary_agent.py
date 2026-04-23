@@ -76,16 +76,16 @@ Generate 3–6 specific, actionable clinical recommendations based on the above.
 Rules for recommendations:
 - If consistency score is LOW, FIRST recommendation must be to verify contradictory history
 - Lead with the most urgent action (e.g., "Immediate ECG and troponin")
-- Reference specific flags/diagnoses (e.g., "Verify {drug_name} before administering")
+- Reference specific flags/diagnoses (e.g., "Verify {{drug_name}} before administering")
 - Include data collection if critical vitals/labs are missing
 - End with specialist referral if warranted
 - Never recommend "watchful waiting" when CRITICAL flags present
 - Keep each recommendation ≤ 15 words
 
 Return valid JSON only:
-{
+{{
   "recommendations": ["Immediate ECG and troponin", "Hold clarithromycin pending cardiology review"]
-}
+}}
 """)
 
 
@@ -246,7 +246,8 @@ def run_summary(
 
     # Parse recommendations
     try:
-        cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", str(result)).strip()
+        raw_text = getattr(result, "raw", None) or getattr(result, "output", None) or str(result)
+        cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw_text).strip()
         recs_data = json.loads(cleaned)
         recs = recs_data.get("recommendations", [])[:6]
         report.recommendations = recs if recs else _fallback_recommendations(red_flags)

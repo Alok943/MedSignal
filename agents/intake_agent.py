@@ -51,7 +51,7 @@ INTAKE_TASK_PROMPT = dedent("""
 Extract structured clinical data from the input.
 
 Return JSON with:
-{
+{{
   "age": int or null,
   "sex": "male"|"female"|"unknown",
   "symptoms": [],
@@ -60,12 +60,12 @@ Return JSON with:
   "medications": [],
   "habits": [],
   "history": [],
-  "timeline": {"onset": null, "duration": null},
+  "timeline": {{"onset": null, "duration": null}},
   "negations": [],
   "uncertain": [],
   "missing_fields": [],
   "data_quality": "HIGH|MEDIUM|LOW"
-}
+}}
 
 Patient input:
 {patient_input}
@@ -287,8 +287,9 @@ def run_intake(llm, patient_input: str) -> Dict[str, Any]:
     result = crew.kickoff()
 
     try:
-        raw = re.sub(r"```(?:json)?|```", "", str(result)).strip()
-        data = json.loads(str(result))
+        raw_text = getattr(result, "raw", None) or getattr(result, "output", None) or str(result)
+        raw = re.sub(r"```(?:json)?|```", "", raw_text).strip()
+        data = json.loads(raw)   # ← use raw, not str(result)
     except Exception as e:
         print(f"[ERROR] Invalid JSON: {e}")
         return {"error": "Invalid LLM output", "original_text": patient_input}

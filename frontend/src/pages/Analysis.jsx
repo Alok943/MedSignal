@@ -132,10 +132,12 @@ export default function Analysis() {
 
         // Try real API, fall back to demo
         try {
-            const res = await axios.post('http://localhost:8000/analyze', { case: caseText }, { timeout: 30000 });
+            const res = await axios.post('http://127.0.0.1:8000/analyze', { case: caseText }, { timeout: 30000 });
             setResult(res.data);
-        } catch {
-            setResult(DEMO_RESULT);
+        } catch (err) {
+            console.error("API failed:", err);
+            alert("Backend not connected!");
+}
         }
         setLoading(false);
     }
@@ -472,4 +474,3 @@ export default function Analysis() {
             <Footer />
         </div>
     );
-}
