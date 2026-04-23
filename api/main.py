@@ -23,20 +23,83 @@ logging.basicConfig(level=logging.INFO)
 from functools import lru_cache
 
 @lru_cache(maxsize=1)
+
+
 def get_llm():
-    api_key = os.getenv("AMD_API_KEY")
-    base_url = os.getenv("AMD_API_BASE", "https://api.inference.amd.com/v1")
+    provider = os.getenv("LLM_PROVIDER", "google")
 
-    if not api_key:
-        raise ValueError("AMD_API_KEY not set in environment")
+    # ───────── GOOGLE (Gemini) ─────────
+    if provider == "google":
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
-    return ChatOpenAI(
-        model=os.getenv("AMD_MODEL", "meta-llama/Llama-3.1-8B-Instruct"),
-        api_key=SecretStr(api_key),
-        base_url=base_url,
-        temperature=0.1,
-       
-    )
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY not set")
+
+        model = os.getenv("GOOGLE_MODEL", "gemini-1.5-flash")
+
+        return ChatGoogleGenerativeAI(
+            model=model,
+            google_api_key=api_key,
+            temperature=0.1,
+        )
+
+    # ───────── GROQ ─────────
+    elif provider == "groq":
+        from langchain_openai import ChatOpenAI
+
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY not set")
+
+        model = os.getenv("GROQ_MODEL", "llama3-70b-8192")
+        base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+
+        return ChatOpenAI(
+            model=model,
+            api_key=SecretStr(api_key),
+            base_url=base_url,
+            temperature=0.1,
+        )
+
+    # ───────── AMD ─────────
+    elif provider == "amd":
+        from langchain_openai import ChatOpenAI
+
+        api_key = os.getenv("AMD_API_KEY")
+        if not api_key:
+            raise ValueError("AMD_API_KEY not set")
+
+        model = os.getenv("AMD_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
+        base_url = os.getenv("AMD_API_BASE", "https://api.inference.amd.com/v1")
+
+        return ChatOpenAI(
+            model=model,
+            api_key=SecretStr(api_key),
+            base_url=base_url,
+            temperature=0.1,
+        )
+
+    # ───────── LIGHTNING AI ─────────
+    elif provider == "lightning":
+        from langchain_openai import ChatOpenAI
+
+        api_key = os.getenv("LIGHTNING_API_KEY")
+        if not api_key:
+            raise ValueError("LIGHTNING_API_KEY not set")
+
+        model = os.getenv("LIGHTNING_MODEL", "gemma")
+        base_url = os.getenv("LIGHTNING_BASE_URL", "https://your-lightning-endpoint")
+
+        return ChatOpenAI(
+            model=model,
+            api_key=SecretStr(api_key),
+            base_url=base_url,
+            temperature=0.1,
+        )
+
+    else:
+        raise ValueError(f"Unsupported LLM_PROVIDER: {provider}")
 
 # =============================
 # FastAPI App
