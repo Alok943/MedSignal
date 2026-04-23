@@ -89,7 +89,7 @@ def run_medsignal_crew(llm, structured_data: dict) -> FinalReport:
             for future in as_completed(futures, timeout=15): # FIXED: added timeout
                 label = futures[future]
                 try:
-                    result = future.result(timeout=0.1)
+                    result = future.result(timeout=14)
                     if label == "ddx":
                         ddx_result = result
                     elif label == "red_flag":

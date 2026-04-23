@@ -1,0 +1,20 @@
+# Frontend (built separately)
+frontend/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Dev/env
+.env
+.git/
+.gitignore
+
+# Misc
+*.md
+assets/
+demo/
+tests/

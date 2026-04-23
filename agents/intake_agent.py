@@ -287,7 +287,13 @@ def run_intake(llm, patient_input: str) -> Dict[str, Any]:
     result = crew.kickoff()
 
     try:
-        raw_text = getattr(result, "raw", None) or getattr(result, "output", None) or str(result)
+        raw_text = (
+    getattr(result, "raw", None) or
+    getattr(result, "output", None) or
+    getattr(result, "text", None) or
+    str(result)
+)
+        
         raw = re.sub(r"```(?:json)?|```", "", raw_text).strip()
         data = json.loads(raw)   # ← use raw, not str(result)
     except Exception as e:
@@ -295,6 +301,18 @@ def run_intake(llm, patient_input: str) -> Dict[str, Any]:
         return {"error": "Invalid LLM output", "original_text": patient_input}
 
     data["original_text"] = patient_input
+    # Flatten vitals if LLM returned objects instead of strings
+    raw_vitals = data.get("vitals", [])
+    data["vitals"] = [
+        f"{v.get('type', '')} {v.get('value', '')} {v.get('location', '')}".strip()
+        if isinstance(v, dict) else str(v)
+        for v in raw_vitals
+]
+    for field in ["symptoms", "conditions", "medications", "habits", "history", "negations"]:
+        data[field] = [
+        json.dumps(v) if isinstance(v, dict) else str(v)
+        for v in data.get(field, [])
+    ]
     print(f"[LLM_OUTPUT] {data}")
 
     try:

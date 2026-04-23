@@ -99,37 +99,37 @@ function AgentRow({ agent, status }) {
 }
 
 function transformApiResponse(data) {
-  const probColor = { HIGH: '#ED1C24', MEDIUM: '#f97316', LOW: '#fbbf24' };
-  const topCondition = data.differential?.[0]?.condition || 'Unknown';
-  const sev = data.severity;
+    const probColor = { HIGH: '#ED1C24', MEDIUM: '#f97316', LOW: '#fbbf24' };
+    const topCondition = data.differential?.[0]?.condition || 'Unknown';
+    const sev = data.severity;
 
-  return {
-    severity: sev,
-    headline: topCondition,
-    subheadline: sev === 'CRITICAL'
-      ? 'Critical risk detected — urgent evaluation required'
-      : sev === 'HIGH'
-      ? 'High-risk features present — prompt evaluation needed'
-      : 'Risk factors identified — clinical review recommended',
-    dataQuality: data.data_quality,
-    dataQualityNote: data.consistency_notes?.length
-      ? `(${data.consistency_notes.length} consistency issue(s) found)`
-      : '(based on available data)',
-    redFlags: data.red_flags?.map(f => `[${f.severity}] ${f.flag} — ${f.reasoning}`) || [],
-    differential: data.differential?.map((d, i) => ({
-      rank: String(i + 1).padStart(2, '0'),
-      condition: d.condition,
-      reasoning: d.reasoning,
-      probability: d.probability,
-      probColor: probColor[d.probability] || '#fbbf24',
-      border: probColor[d.probability] || '#fbbf24',
-    })) || [],
-    actions: data.recommendations || [],
-    missing: data.consistency_notes?.length
-      ? data.consistency_notes
-      : ['No major data gaps detected'],
-    requires_verification: data.requires_verification,
-  };
+    return {
+        severity: sev,
+        headline: topCondition,
+        subheadline: sev === 'CRITICAL'
+            ? 'Critical risk detected — urgent evaluation required'
+            : sev === 'HIGH'
+                ? 'High-risk features present — prompt evaluation needed'
+                : 'Risk factors identified — clinical review recommended',
+        dataQuality: data.data_quality,
+        dataQualityNote: data.consistency_notes?.length
+            ? `(${data.consistency_notes.length} consistency issue(s) found)`
+            : '(based on available data)',
+        redFlags: data.red_flags || [],
+        differential: data.differential?.map((d, i) => ({
+            rank: String(i + 1).padStart(2, '0'),
+            condition: d.condition,
+            reasoning: d.reasoning,
+            probability: d.probability,
+            probColor: probColor[d.probability] || '#fbbf24',
+            border: probColor[d.probability] || '#fbbf24',
+        })) || [],
+        actions: data.recommendations || [],
+        missing: data.consistency_notes?.length
+            ? data.consistency_notes
+            : ['No major data gaps detected'],
+        requires_verification: data.requires_verification,
+    };
 }
 
 export default function Analysis() {
@@ -164,17 +164,20 @@ export default function Analysis() {
         await seq({ consist: 'COMPLETED', summary: 'PROCESSING' }, 900);
         await seq({ summary: 'COMPLETED' }, 700);
 
-       try {
-const res = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/analyze`, { case: caseText }, { timeout: 60000 });    setResult(transformApiResponse(res.data));
-} catch (err) {
-    console.error("API failed:", err);
-    setResult(null); // falls back to DEMO_RESULT
-} finally {
-    setLoading(false);
-}
+        try {
+            const res = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/analyze`, { case: caseText }, { timeout: 60000 }); setResult(transformApiResponse(res.data));
+            console.log("API RESPONSE:", res.data);
+            console.log("TRANSFORMED:", transformApiResponse(res.data));
+        } catch (err) {
+            console.error("API failed:", err);
+            setResult(null); // falls back to DEMO_RESULT
+        } finally {
+            setLoading(false);
+        }
     }
 
-    const r = result || DEMO_RESULT;
+    const r = result ?? DEMO_RESULT;
+    console.log("FINAL R:", r);
 
     return (
         <div style={{ minHeight: '100vh', position: 'relative' }}>
@@ -300,12 +303,17 @@ const res = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.
                         <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {r.redFlags?.map((f, i) => (
                                 <li key={i} style={{
-                                    display: 'flex', alignItems: 'flex-start', gap: '12px',
-                                    background: 'rgba(31,54,81,0.25)', padding: '12px',
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    gap: '12px',
+                                    background: 'rgba(31,54,81,0.25)',
+                                    padding: '12px',
                                     border: '1px solid rgba(31,54,81,0.5)'
                                 }}>
                                     <span style={{ color: '#ED1C24', fontWeight: 700, fontSize: '18px', lineHeight: 1 }}>—</span>
-                                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '13px', color: 'var(--text)' }}>{f}</span>
+                                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '13px', color: 'var(--text)' }}>
+                                        {f.flag}
+                                    </span>
                                 </li>
                             ))}
                         </ul>

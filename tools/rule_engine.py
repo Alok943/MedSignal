@@ -253,7 +253,7 @@ RISK_PATTERNS = [
         "name": "Hepatotoxicity Risk",
         "severity": "HIGH",
         "meds_any": ["paracetamol", "acetaminophen"],
-        "habits_any": ["heavy alcohol", "binge drinking"],
+        "habits_any": ["heavy alcohol", "binge drinking", "alcohol", "drink heavily", "drinks heavily", "units/day", "units per day"],
         "weights": {"med": 2, "habit": 2},
         "min_required_weight": 3,
         "reasoning": "Paracetamol + alcohol",
