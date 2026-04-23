@@ -117,10 +117,35 @@ Raw Patient Input (unstructured text)
                     ▼
         Structured Clinical Report
 ```
+ConsistencyOutput → modulates RedFlagOutput (uncertainty-aware reasoning)
 
 Parallel agent execution is only viable at low latency because of AMD's compute stack. The DDx, Red Flag, and Consistency agents run **concurrently** on AMD Instinct MI300X — not sequentially. This is the core GPU advantage: multiple reasoning tasks handled simultaneously, reducing response time from seconds to near real-time.
 
+## 🛡️ Fault Tolerance
+
+- LLM calls protected with timeout (10s)
+- On timeout or parse failure:
+  - System falls back to deterministic rules + FDA signals
+- Ensures system never crashes or returns empty output
 ---
+
+## 🧠 Cross-Agent Reasoning (Key Innovation)
+
+Unlike traditional pipelines where agents operate independently, MedSignal enables agents to influence each other’s behavior.
+
+### Flow:
+Consistency Agent → Red Flag Agent
+
+### Behavior:
+- HIGH consistency → normal reasoning
+- MEDIUM consistency → reduced confidence in LLM-derived flags
+- LOW consistency:
+  - Adds global warning: "Unreliable clinical history"
+  - Penalizes LLM confidence (−0.15)
+  - Applies targeted escalation only when contradictions directly impact risk
+
+### Why it matters:
+Instead of blindly escalating severity, the system models **uncertainty in clinical data**, mimicking real-world emergency decision-making.
 
 ## 🤖 The Five Agents
 

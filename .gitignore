@@ -29,5 +29,5 @@ Thumbs.db
 *.egg-info/
 dist/
 build/
-
+stitch
 CHANGELOG.md

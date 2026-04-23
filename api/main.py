@@ -3,6 +3,11 @@ from fastapi.middleware.cors import DEFAULT_MAX_AGE
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(level=logging.DEBUG) 
 
 # Assuming these are your local imports based on project structure
 # from agents.intake_agent import run_intake
