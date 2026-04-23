@@ -98,6 +98,40 @@ function AgentRow({ agent, status }) {
     );
 }
 
+function transformApiResponse(data) {
+  const probColor = { HIGH: '#ED1C24', MEDIUM: '#f97316', LOW: '#fbbf24' };
+  const topCondition = data.differential?.[0]?.condition || 'Unknown';
+  const sev = data.severity;
+
+  return {
+    severity: sev,
+    headline: topCondition,
+    subheadline: sev === 'CRITICAL'
+      ? 'Critical risk detected — urgent evaluation required'
+      : sev === 'HIGH'
+      ? 'High-risk features present — prompt evaluation needed'
+      : 'Risk factors identified — clinical review recommended',
+    dataQuality: data.data_quality,
+    dataQualityNote: data.consistency_notes?.length
+      ? `(${data.consistency_notes.length} consistency issue(s) found)`
+      : '(based on available data)',
+    redFlags: data.red_flags?.map(f => `[${f.severity}] ${f.flag} — ${f.reasoning}`) || [],
+    differential: data.differential?.map((d, i) => ({
+      rank: String(i + 1).padStart(2, '0'),
+      condition: d.condition,
+      reasoning: d.reasoning,
+      probability: d.probability,
+      probColor: probColor[d.probability] || '#fbbf24',
+      border: probColor[d.probability] || '#fbbf24',
+    })) || [],
+    actions: data.recommendations || [],
+    missing: data.consistency_notes?.length
+      ? data.consistency_notes
+      : ['No major data gaps detected'],
+    requires_verification: data.requires_verification,
+  };
+}
+
 export default function Analysis() {
     const [caseText, setCaseText] = useState(() =>
         sessionStorage.getItem('medsignal_case') ||
@@ -130,16 +164,15 @@ export default function Analysis() {
         await seq({ consist: 'COMPLETED', summary: 'PROCESSING' }, 900);
         await seq({ summary: 'COMPLETED' }, 700);
 
-        // Try real API, fall back to demo
-        try {
-            const res = await axios.post('http://127.0.0.1:8000/analyze', { case: caseText }, { timeout: 30000 });
-            setResult(res.data);
-        } catch (err) {
-            console.error("API failed:", err);
-            alert("Backend not connected!");
+       try {
+    const res = await axios.post('http://127.0.0.1:8000/analyze', { case: caseText }, { timeout: 60000 });
+    setResult(transformApiResponse(res.data));
+} catch (err) {
+    console.error("API failed:", err);
+    setResult(null); // falls back to DEMO_RESULT
+} finally {
+    setLoading(false);
 }
-        }
-        setLoading(false);
     }
 
     const r = result || DEMO_RESULT;
@@ -474,3 +507,4 @@ export default function Analysis() {
             <Footer />
         </div>
     );
+}
