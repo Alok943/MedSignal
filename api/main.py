@@ -187,7 +187,7 @@ async def analyze_case(request: CaseRequest):
 
         # ── Stage 1: Intake ───────────────────────────────
         logger.debug(f"Intake starting for: {case_text[:80]}")
-        structured_data = run_intake(llm, case_text)
+        structured_data = await asyncio.to_thread(run_intake, llm, case_text)
 
         if "error" in structured_data:
             raise HTTPException(
@@ -199,9 +199,8 @@ async def analyze_case(request: CaseRequest):
 
         # ── Stages 2–5: Crew ─────────────────────────────
         try:
-            final_report = await asyncio.wait_for(
-                asyncio.to_thread(run_medsignal_crew, llm, structured_data),
-                timeout=20
+            final_report = await asyncio.to_thread(
+                        run_medsignal_crew, llm, structured_data
             )
         except asyncio.TimeoutError:
             logger.error("Pipeline timeout")

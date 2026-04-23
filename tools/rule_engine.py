@@ -20,6 +20,51 @@ class RuleMatch:
 RISK_PATTERNS = [
 
     # -------------------------
+    # MENINGITIS (2-of-3 triad)
+    # -------------------------
+    {
+        "name": "Meningitis Triad",
+        "severity": "CRITICAL",
+        "symptoms_any": ["neck stiffness", "nuchal rigidity", "stiff neck"],
+        "warning_any": ["fever", "febrile", "high temperature","light sensitivity", "photophobia"],
+        "altered_mental": True,
+        "weights": {"symptom": 3, "warning": 3, "mental": 3},
+        # 🔧 FIX: Increased threshold to prevent fever-only false positives
+        # Requires combination (fever + neck stiffness / mental change)
+        "min_required_weight": 6,
+        "reasoning": "Meningitis triad: neck stiffness + fever/confusion",
+    },
+
+    # -------------------------
+    # ADRENAL CRISIS
+    # -------------------------
+    {
+        "name": "Adrenal Crisis",
+        "severity": "CRITICAL",
+        "meds_any": ["prednisolone", "prednisone", "dexamethasone", "hydrocortisone",
+                     "methylprednisolone", "corticosteroid", "steroid"],
+        "symptoms_any": ["fever", "hypotension", "low blood pressure", "low bp", "collapse"],
+        "altered_mental": True,
+        "weights": {"med": 3, "symptom": 2, "mental": 2},
+        "min_required_weight": 5,
+        "reasoning": "Corticosteroid use + fever + hypotension/confusion",
+    },
+
+    # -------------------------
+    # SEROTONIN SYNDROME
+    # -------------------------
+    {
+        "name": "Serotonin Syndrome Risk",
+        "severity": "CRITICAL",
+        "meds_any": ["phenelzine", "tranylcypromine", "selegiline", "moclobemide", "maoi"],
+        "meds_co": ["ssri", "sertraline", "fluoxetine", "citalopram", "escitalopram",
+                    "paroxetine", "venlafaxine", "duloxetine", "tramadol", "linezolid"],
+        "weights": {"med": 3},
+        "min_required_weight": 3,
+        "reasoning": "MAOI + serotonergic drug combination",
+    },
+    
+    # -------------------------
     # CARDIAC
     # -------------------------
     {
@@ -29,7 +74,7 @@ RISK_PATTERNS = [
         "conditions_any": ["diabetes", "diabetic"],
         "habits_any": ["smoking", "smoker"],
         "age_min": 50,
-        "weights": {"symptom": 3, "condition": 1, "habit": 1, "age": 1},
+        "weights": {"symptom": 4, "condition": 1, "habit": 1, "age": 1},
         "min_required_weight": 4,
         "reasoning": "Chest symptoms + cardiac risk factors",
     },
@@ -75,27 +120,29 @@ RISK_PATTERNS = [
     },
 
     {
-        "name": "Hypoglycemia",
-        "severity": "CRITICAL",
-        "conditions_any": ["diabetes"],
-        "symptoms_any": ["sweating", "tremor", "confusion", "dizziness", "loss of consciousness"],
-        "meds_any": ["insulin", "glimepiride", "gliclazide"],
-        "weights": {"symptom": 3, "med": 2},
-        "min_required_weight": 3,
-        "reasoning": "Diabetic on meds + neuro symptoms",
+    "name": "Hypoglycemia",
+    "severity": "MEDIUM",  # 🔧 downgraded
+    "conditions_any": ["diabetes"],
+    "symptoms_any": ["confusion", "loss of consciousness", "seizure"],  # 🔧 stricter
+    "meds_any": ["insulin", "glimepiride", "gliclazide"],
+    "weights": {"symptom": 3, "med": 2},
+    # 🔧 FIX: Prevent false positives (confusion alone shouldn't trigger hypoglycemia)
+    # Requires BOTH medication exposure + neuro symptoms
+    "min_required_weight": 5,
+    "reasoning": "Diabetic on meds + neuroglycopenic symptoms",
     },
 
     # -------------------------
     # ALLERGY
     # -------------------------
     {
-        "name": "Anaphylaxis",
-        "severity": "CRITICAL",
-        "symptoms_any": ["breathlessness", "wheeze", "swelling face", "lip swelling", "hives"],
-        "exposure_any": ["new drug", "injection", "food", "insect bite"],
-        "weights": {"symptom": 3, "exposure": 2},
-        "min_required_weight": 3,
-        "reasoning": "Airway compromise after exposure",
+    "name": "Anaphylaxis",
+    "severity": "CRITICAL",
+    "symptoms_any": ["wheeze", "swelling face", "lip swelling", "hives"],
+    "exposure_any": ["new drug", "injection", "food", "insect bite"],
+    "weights": {"symptom": 3, "exposure": 3},  # 🔧 stronger requirement
+    "min_required_weight": 4,  # 🔧 requires BOTH
+    "reasoning": "Allergic reaction with airway involvement",
     },
 
     # -------------------------
@@ -220,7 +267,7 @@ RISK_PATTERNS = [
         "min_required_weight": 3,
         "reasoning": "Opioid + benzodiazepine",
     },
-]
+    ]
 
 
 # -----------------------------
@@ -279,9 +326,7 @@ def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
     if "meds_co" in pattern:
         if signals.get("med") and match_any(medications, pattern["meds_co"]):
             signals["med_co"] = True
-        elif "meds_co" in pattern:
-        # meds_any didn't match, skip
-            pass
+        
 
     if "meds_all" in pattern and match_all(medications, pattern["meds_all"]):
         matched_weight += pattern["weights"].get("med", 0)
@@ -338,6 +383,32 @@ def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
         matched_weight -= pattern["weights"].get("med", 0)
         signals.pop("med", None)
     
+    # ==============================
+    # 🔧 CLINICAL SAFETY GUARDS
+    # ==============================
+
+    # 🔧 FIX: Prevent meningitis false positive (requires neck stiffness)
+    if pattern["name"] == "Meningitis Triad":
+        if not match_any(symptoms, ["neck stiffness", "stiff neck", "nuchal rigidity"]):
+            return None
+
+    # 🔧 FIX: Hypoglycemia must have diabetes or medication context
+    if pattern["name"] == "Hypoglycemia":
+        if not (
+            match_any(conditions, ["diabetes"]) or
+            match_any(medications, ["insulin", "glimepiride", "gliclazide"])
+    ):
+            return None
+
+    # 🔧 FIX: Dengue must have fever (avoid seasonal + abdominal pain false positives)
+    if pattern["name"] == "Dengue Warning Signs":
+        if not match_any(symptoms, ["fever", "high fever"]):
+            return None
+    # 🔧 FIX: Anaphylaxis requires BOTH exposure + airway symptom
+    if pattern["name"] == "Anaphylaxis":
+        if not signals.get("exposure"):
+            return None
+    
     # threshold
     if matched_weight < pattern.get("min_required_weight", 1):
         return None
@@ -375,16 +446,73 @@ def run_hard_rules(structured_input: Dict) -> List[RuleMatch]:
         "medications": normalize_list(structured_input.get("medications", [])),
         "habits": normalize_list(structured_input.get("habits", [])),
         "conditions": normalize_list(structured_input.get("conditions", [])),
-        "vitals": normalize_list(structured_input.get("vitals", [])),  # NEW
+        "vitals": normalize_list(structured_input.get("vitals", [])),
         "age": structured_input.get("age", 0),
-        "month": structured_input.get("month"),  # optional
+        "month": structured_input.get("month"),
     }
 
+    # ✅ STEP 1: initialize results
     results = []
 
+    # ==============================
+    # 🔧 NEW: Numeric vitals parsing
+    # Detect hypotension from values like "80/50"
+    # ==============================
+    for v in data["vitals"]:
+        if "/" in v:
+            try:
+                systolic = int(v.split("/")[0])
+                if systolic < 90:
+                    results.append(RuleMatch(
+                        severity="CRITICAL",
+                        flag="Hypotension",
+                        reasoning="Systolic BP < 90",
+                        confidence=1.0,
+                        signals={"vital": True}
+                    ))
+            except:
+                pass
+
+    # ✅ STEP 2: collect matches
     for pattern in RISK_PATTERNS:
         match = evaluate_pattern(pattern, data)
         if match:
             results.append(match)
+
+    # ==============================
+    # ✅ STEP 3: POST-PROCESSING (control layer)
+    # ==============================
+
+    # 🔧 FIX: Prevent TB false positives without cough
+    results = [
+        r for r in results
+        if not (r.flag == "Pulmonary TB Red Flag" and "cough" not in " ".join(data["symptoms"]))
+    ]
+
+    # 🔧 CONTROL: Cardiac emergencies dominate weaker risks
+    has_acs = any(r.flag == "Probable ACS" for r in results)
+
+    if has_acs:
+        for r in results:
+            if r.flag == "Hypoglycemia":
+                r.severity = "MEDIUM"
+
+    # 🔧 CONTROL: Avoid too many CRITICAL flags (alarm fatigue)
+    critical_count = sum(1 for r in results if r.severity == "CRITICAL")
+
+    if critical_count > 2:
+        for r in results:
+            if r.flag not in ["Probable ACS", "Possible Stroke", "Sepsis Risk"]:
+                if r.severity == "CRITICAL":
+                    r.severity = "HIGH"
+
+    # ==============================
+    # 🔧 FINAL SAFETY GUARD
+    # Prevent accidental CRITICAL escalation
+    # ==============================
+    if not any(r.flag in ["Probable ACS", "Possible Stroke", "Sepsis Risk", "Hypotension"] for r in results):
+        for r in results:
+            if r.severity == "CRITICAL":
+                r.severity = "HIGH"
 
     return results

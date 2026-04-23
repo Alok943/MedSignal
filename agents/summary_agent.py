@@ -74,14 +74,34 @@ TASK:
 Generate 3–6 specific, actionable clinical recommendations based on the above.
 
 Rules for recommendations:
-- If consistency score is LOW, FIRST recommendation must be to verify contradictory history
-- Lead with the most urgent action (e.g., "Immediate ECG and troponin")
-- Reference specific flags/diagnoses (e.g., "Verify {{drug_name}} before administering")
-- Include data collection if critical vitals/labs are missing
-- End with specialist referral if warranted
-- Never recommend "watchful waiting" when CRITICAL flags present
-- Keep each recommendation ≤ 15 words
 
+- If consistency score is LOW, FIRST recommendation must be "Verify contradictory history"
+
+- Order strictly:
+  (1) immediate life-saving actions
+  (2) investigations
+  (3) data collection
+  (4) referrals
+
+- For CRITICAL flags, start with:
+  "Initiate [condition] protocol immediately"
+  (e.g., "Initiate ACS protocol immediately")
+
+- Never use vague phrasing like "verify symptoms" for critical conditions
+
+- Only recommend CT for PE if breathlessness, hypoxia, or DVT signs are present
+
+- Only recommend LP if meningitis signs (fever + neck stiffness + altered mental status) are present
+
+- Reference specific diagnoses or flags explicitly
+
+- End with specialist referral if warranted
+
+- Never recommend "watchful waiting" when CRITICAL flags are present
+
+- Avoid unrelated diagnoses (e.g., TB without cough >2 weeks)
+
+- Keep each recommendation ≤ 15 words
 Return valid JSON only:
 {{
   "recommendations": ["Immediate ECG and troponin", "Hold clarithromycin pending cardiology review"]
@@ -132,9 +152,14 @@ def _assemble_without_llm(
     consistency_notes += [
     f"Missing: {g}" for g in consistency.data_gaps[:3]
     ]
-
+    
+    # 🔧 SAFETY: no red flags → LOW severity
+    if not rf_items:
+        severity = "LOW"
+    else:
+        severity = red_flags.overall_severity
     return FinalReport(
-        severity=red_flags.overall_severity,
+        severity=severity,
         red_flags=rf_items,
         differential=diff_items,
         recommendations=[],    # filled by LLM call
@@ -264,38 +289,60 @@ def run_summary(
 # =============================
 
 def _fallback_recommendations(red_flags: RedFlagOutput) -> List[str]:
-    """Generate basic recommendations from flag types when LLM fails."""
     recs = []
+
+    # 1. Data quality first
     if any("unreliable" in f.flag.lower() for f in red_flags.red_flags):
-        recs.append("Verify contradictory history before proceeding")
+        recs.append("Verify contradictory history")
+
+    # 2. Immediate life-saving actions (priority)
     for f in red_flags.red_flags:
         flag_lower = f.flag.lower()
         reasoning_lower = f.reasoning.lower()
 
-        if "acs" in flag_lower or "chest" in reasoning_lower:
-            recs.append("Immediate ECG and troponin")
+        if "acs" in flag_lower:
+            recs.append("Initiate ACS protocol immediately")
 
-        if "warfarin" in reasoning_lower or "bleeding" in flag_lower:
-            recs.append("Review anticoagulant + interacting medication immediately")
+        elif "stroke" in flag_lower:
+            recs.append("Initiate stroke protocol immediately")
 
-        if "meningitis" in flag_lower:
-            recs.append("Urgent LP and empirical antibiotics")
+        elif "sepsis" in flag_lower:
+            recs.append("Initiate sepsis protocol immediately")
 
-        if "adrenal" in flag_lower:
-            recs.append("Immediate hydrocortisone — do not delay for investigations")
+        elif "anaphylaxis" in flag_lower:
+            recs.append("Administer IM epinephrine immediately")
 
-        if "serotonin" in flag_lower:
-            recs.append("Discontinue serotonergic agent — monitor for hyperthermia")
+        elif "adrenal" in flag_lower:
+            recs.append("Administer IV hydrocortisone immediately")
+
+    # 3. Investigations
+    for f in red_flags.red_flags:
+        flag_lower = f.flag.lower()
+
+        if "acs" in flag_lower:
+            recs.append("Order ECG and troponin")
+
+        if "bleeding" in flag_lower:
+            recs.append("Check coagulation profile and INR")
 
         if "hepatotox" in flag_lower:
-            recs.append("Stop paracetamol — check LFTs urgently")
+            recs.append("Check liver function tests urgently")
 
-        if "respiratory" in flag_lower:
-            recs.append("Monitor respiratory rate and O2 saturation closely")
+    # 4. Data collection
+    for f in red_flags.red_flags:
+        if "missing" in f.flag.lower():
+            recs.append("Collect missing clinical data")
 
-    recs = list(dict.fromkeys(recs))  # deduplicate
+    # 5. Referral
+    if any("acs" in f.flag.lower() for f in red_flags.red_flags):
+        recs.append("Urgent cardiology referral")
+
+    # Deduplicate while preserving order
+    recs = list(dict.fromkeys(recs))
+
     if not recs:
-        recs = ["Urgent clinical review required", "Do not discharge without specialist assessment"]
+        recs = ["Urgent clinical evaluation required"]
+
     return recs[:6]
 
 

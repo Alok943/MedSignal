@@ -36,6 +36,7 @@ DDX_TASK_PROMPT = dedent("""
 Generate ranked differential diagnosis from structured patient data.
 
 RULES:
+- Do NOT include TB unless cough >2 weeks, hemoptysis, weight loss, or night sweats present
 - chest pain + any of (age>50, smoking, diabetes, hypertension) → ACS probability MUST be HIGH unless strong alternative diagnosis present
 - Never assign MEDIUM to ACS when 2+ cardiac risk factors present
 - Always return 3–5 diagnoses regardless of data quality
@@ -55,6 +56,9 @@ RULES:
 - missing_critical_data: list clinically relevant gaps
 - If priority_hint exists, include it in top 1–2 unless contradicted
 - Always return 1–5 diagnoses, ranks sequential from 1
+- Only recommend CT for PE if breathlessness, hypoxia, or DVT signs present
+- Always prioritize life-saving actions first
+- Data collection should come AFTER immediate investigations
 
 OUTPUT — valid JSON only, no markdown:
 {{"differential":[{{"rank":1,"condition":"...","severity":"...","probability":"...","reasoning":"symptoms:chest pain + conditions:diabetes"}}],"ddx_confidence":"...","ddx_notes":"...","missing_critical_data":[...]}}

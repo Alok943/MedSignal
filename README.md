@@ -1,3 +1,11 @@
+---
+title: MedSignal
+emoji: 🏥
+colorFrom: red
+colorTo: blue
+sdk: docker
+pinned: false
+---
 # 🏥 MedSignal
 ### Multi-Agent Clinical Risk Detection System
 

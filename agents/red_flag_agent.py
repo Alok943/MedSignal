@@ -36,12 +36,17 @@ class RedFlagOutput(BaseModel):
 # Prompt
 # =============================
 
-RED_FLAG_TASK_PROMPT = dedent(
-    """
--You are an emergency medicine specialist. Identify ONLY NEW clinical red flags.
+RED_FLAG_TASK_PROMPT = dedent("""
+You are an emergency medicine specialist. Identify ONLY NEW clinical red flags.
+
+STRICT CLINICAL RULES (highest priority — follow exactly):
+- NEVER flag anaphylaxis unless explicit symptoms present: throat swelling, hives, sudden hypotension, stridor
 - Hypoglycemia is MEDIUM unless confirmed neuro symptoms (confusion, seizure, LOC) present
 - Do NOT promote hypoglycemia to CRITICAL based on diabetes alone
-- ACS with chest pain + 2+ risk factors is always CRITICAL and overrides hypoglycemia priority
+- ACS with chest pain + 2+ cardiac risk factors is always CRITICAL and overrides all other flags
+- Do NOT invent medications, symptoms, or history not present in input
+- LLM-derived flag confidence: 0.60–0.80 only. Never exceed 0.80
+
 PRE-VALIDATED FLAGS (DO NOT REPEAT OR MODIFY):
 {rule_matches}
 
@@ -55,13 +60,7 @@ TASK:
 1. Analyze symptom clusters, drug-disease interactions, and clinical context.
 2. Add ONLY new red flags not already listed above.
 3. Flag missing critical data as MEDIUM severity.
-4. DO NOT invent medications, symptoms, or history.
-5. Return ONLY valid JSON matching the schema.
-
-
-CONFIDENCE GUIDELINES:
-- LLM-derived flags: 0.60-0.80
-- Never exceed 0.80 for probabilistic reasoning.
+4. Return ONLY valid JSON matching the schema.
 
 OUTPUT FORMAT:
 {{
@@ -72,9 +71,7 @@ OUTPUT FORMAT:
   "llm_flags_added": 1,
   "fda_confirmed_count": 0
 }}
-"""
-)
-
+""")
 
 # =============================
 # Helpers

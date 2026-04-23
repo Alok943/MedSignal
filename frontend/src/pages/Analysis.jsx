@@ -165,8 +165,7 @@ export default function Analysis() {
         await seq({ summary: 'COMPLETED' }, 700);
 
        try {
-    const res = await axios.post('http://127.0.0.1:8000/analyze', { case: caseText }, { timeout: 60000 });
-    setResult(transformApiResponse(res.data));
+const res = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/analyze`, { case: caseText }, { timeout: 60000 });    setResult(transformApiResponse(res.data));
 } catch (err) {
     console.error("API failed:", err);
     setResult(null); // falls back to DEMO_RESULT
