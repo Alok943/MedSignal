@@ -261,7 +261,7 @@ export default function Analysis() {
                                         fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: '22px',
                                         color: '#ffb4ab', display: 'flex', alignItems: 'center', gap: '8px'
                                     }}>
-                                        🚨 CRITICAL: {r.headline}
+                                        {r.severity === 'CRITICAL' ? '🚨' : r.severity === 'HIGH' ? '⚠️' : 'ℹ️'} {r.severity}: {r.headline}
                                     </div>
                                     <div style={{
                                         fontFamily: "'Space Grotesk',sans-serif", fontSize: '16px',
