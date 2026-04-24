@@ -199,7 +199,7 @@ def _parse_consistency_safe(raw: str, precheck: List[dict]) -> ConsistencyOutput
     seen = set()
     unique = []
     for c in data["contradictions"]:
-        key = c["description"].lower()
+        key = c.get("description", c.get("flag", str(c))).lower()
         if key not in seen:
             seen.add(key)
             unique.append(c)

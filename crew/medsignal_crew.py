@@ -95,7 +95,7 @@ def run_medsignal_crew(llm, structured_data: dict) -> FinalReport:
                     elif label == "red_flag":
                         red_flag_result = result
                 except Exception as e:
-                    logger.error(f"{label} agent failed: {e}")
+                    logger.error(f"{label} agent failed: {e}", exc_info=True)
         except FutureTimeout:
             logger.error("Parallel execution timed out")
 

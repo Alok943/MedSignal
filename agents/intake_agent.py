@@ -293,8 +293,12 @@ def run_intake(llm, patient_input: str) -> Dict[str, Any]:
     getattr(result, "text", None) or
     str(result)
 )
+        print(f"[RAW_TEXT_DEBUG] type={type(result)} raw={repr(raw_text[:200])}")
         
+        # strip preamble text before first {
         raw = re.sub(r"```(?:json)?|```", "", raw_text).strip()
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        raw = match.group(0) if match else raw
         data = json.loads(raw)   # ← use raw, not str(result)
     except Exception as e:
         print(f"[ERROR] Invalid JSON: {e}")

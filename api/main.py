@@ -29,7 +29,7 @@ def get_llm():
 
     if provider == "groq":
         return LLM(
-            model=f"groq/{os.getenv('GROQ_MODEL', 'llama3-70b-8192')}",
+            model=f"groq/{os.getenv('GROQ_MODEL', 'meta-llama/llama-4-scout-17b-16e-instruct')}",
             api_key=os.getenv("GROQ_API_KEY"),
             temperature=0.1,
             max_tokens=1024,
@@ -212,7 +212,7 @@ async def analyze_case(request: CaseRequest):
         raise
     except Exception as e:
         msg = str(e)
-        logger.error(f"API error: {msg}")
+        logger.error(f"API error: {msg}", exc_info=True)
     
     # surface provider overload cleanly
         if "503" in msg or "UNAVAILABLE" in msg or "high demand" in msg:
