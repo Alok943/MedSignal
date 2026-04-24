@@ -14,7 +14,7 @@ from agents.consistency_agent import ConsistencyOutput
 logger = logging.getLogger(__name__)
 
 
-def _run_with_timeout(crew, timeout=10):
+def _run_with_timeout(crew, timeout=20):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future = executor.submit(crew.kickoff)
         try:
@@ -273,6 +273,10 @@ def run_summary(
     try:
         raw_text = getattr(result, "raw", None) or getattr(result, "output", None) or str(result)
         cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw_text).strip()
+        
+        if not cleaned:  # ← this catches the empty case you hit
+            raise ValueError("Empty LLM response")
+    
         recs_data = json.loads(cleaned)
         recs = recs_data.get("recommendations", [])[:6]
         report.recommendations = recs if recs else _fallback_recommendations(red_flags)
