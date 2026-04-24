@@ -134,7 +134,6 @@ def normalize_list(items: List[str], mappings: Dict[str, str], minimal=False) ->
 def clean_intake(data: Dict[str, Any], mappings: Dict[str, str]) -> Dict[str, Any]:
 
     text = data.get("original_text", "").lower()
-    print("[CLEAN] starting")
 
     data.setdefault("negations", [])
 
@@ -148,7 +147,6 @@ def clean_intake(data: Dict[str, Any], mappings: Dict[str, str]) -> Dict[str, An
                 data["negations"].append(item)
 
         data[field] = list(dict.fromkeys(filtered))
-        print(f"[NEGATION] {field} → {data[field]}")
 
     # ---- Data Quality (early for normalization mode) ----
     quality = compute_data_quality(data)
@@ -159,8 +157,6 @@ def clean_intake(data: Dict[str, Any], mappings: Dict[str, str]) -> Dict[str, An
     data["symptoms"] = normalize_list(data.get("symptoms", []), mappings, minimal_mode)
     data["conditions"] = normalize_list(data.get("conditions", []), mappings, minimal_mode)
     data["habits"] = normalize_list(data.get("habits", []), mappings, minimal_mode)
-
-    print(f"[NORMALIZED] symptoms → {data['symptoms']}")
 
     # ---- Vitals ----
     cleaned_vitals = []
@@ -181,7 +177,6 @@ def clean_intake(data: Dict[str, Any], mappings: Dict[str, str]) -> Dict[str, An
         cleaned_vitals.append(v_l)
 
     data["vitals"] = cleaned_vitals
-    print(f"[VITALS] → {data['vitals']}")
 
     # ---- Timeline ----
     tl = data.get("timeline", {}) or {}
@@ -199,7 +194,6 @@ def clean_intake(data: Dict[str, Any], mappings: Dict[str, str]) -> Dict[str, An
             tl["onset"] = "gradual"
 
     data["timeline"] = tl
-    print(f"[TIMELINE] → {tl}")
 
     return data
 
@@ -278,7 +272,6 @@ def get_intake_task(agent: Agent, patient_input: str) -> Task:
 
 def run_intake(llm, patient_input: str) -> Dict[str, Any]:
 
-    print(f"[RAW_INPUT] {patient_input}")
 
     agent = get_intake_agent(llm)
     task = get_intake_task(agent, patient_input)
@@ -293,7 +286,6 @@ def run_intake(llm, patient_input: str) -> Dict[str, Any]:
     getattr(result, "text", None) or
     str(result)
 )
-        print(f"[RAW_TEXT_DEBUG] type={type(result)} raw={repr(raw_text[:200])}")
         
         # strip preamble text before first {
         raw = re.sub(r"```(?:json)?|```", "", raw_text).strip()
@@ -317,7 +309,7 @@ def run_intake(llm, patient_input: str) -> Dict[str, Any]:
         json.dumps(v) if isinstance(v, dict) else str(v)
         for v in data.get(field, [])
     ]
-    print(f"[LLM_OUTPUT] {data}")
+    
 
     try:
         validated = IntakeOutput(**data).model_dump()
@@ -331,8 +323,6 @@ def run_intake(llm, patient_input: str) -> Dict[str, Any]:
 
     cleaned["missing_fields"] = compute_missing_fields(cleaned)
     cleaned["data_quality"] = compute_data_quality(cleaned)
-
-    print(f"[FINAL_OUTPUT] {cleaned}")
 
     return cleaned
 
