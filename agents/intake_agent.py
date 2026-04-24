@@ -286,7 +286,6 @@ def run_intake(llm, patient_input: str) -> Dict[str, Any]:
     getattr(result, "text", None) or
     str(result)
 )
-        print(f"[RAW_TEXT_DEBUG] type={type(result)} raw={repr(raw_text[:200])}")
         
         # strip preamble text before first {
         raw = re.sub(r"```(?:json)?|```", "", raw_text).strip()
