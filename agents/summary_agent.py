@@ -273,6 +273,9 @@ def run_summary(
     # Parse recommendations
     try:
         raw_text = getattr(result, "raw", None) or getattr(result, "output", None) or str(result)
+        
+        if not raw_text or raw_text.strip().lower() == "none":
+            raise ValueError("Empty LLM response")
         cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw_text).strip()
         
         if not cleaned:  # ← this catches the empty case you hit
