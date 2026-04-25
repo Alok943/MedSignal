@@ -217,7 +217,7 @@ export default function Analysis() {
         }
     }
 
-    const r = result;
+    const r = (result && result.severity) ? result : DEMO_RESULT;
     console.log("FINAL R:", r);
     const severityConfig = {
         CRITICAL: { color: '#ffb4ab', border: 'rgba(255,180,171,0.6)', shadow: 'rgba(255,180,171,0.1)', label: 'CRITICAL' },
