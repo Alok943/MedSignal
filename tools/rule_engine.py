@@ -13,12 +13,96 @@ class RuleMatch:
     confidence: float
     signals: Dict[str, bool]
 
+# -----------------------------
+# Critical flags that must never be downgraded
+# -----------------------------
+ALWAYS_CRITICAL = {
+    "Probable ACS", "Possible Stroke", "Sepsis Risk", "Hypotension",
+    "Meningitis Triad", "Adrenal Crisis", "Serotonin Syndrome Risk",
+    "Diabetic Ketoacidosis", "Anaphylaxis", "Organophosphate Poisoning",
+    "Heat Stroke", "Pregnancy Bleeding Risk", "Ectopic Pregnancy Risk",
+    "Pulmonary Embolism Risk", "Pre-eclampsia Risk", "Acute Liver Failure",
+    "Snake Envenomation", "Upper GI Bleed","Rabies Exposure Risk", "Tetanus Prone Wound", 
+    "Head Injury Red Flag",
+    "Compartment Syndrome", "Major Burn", "Scorpion Envenomation",
+    "Occult Fracture Risk"
+}
 
 # -----------------------------
 # Risk Patterns (Global + India)
 # -----------------------------
 RISK_PATTERNS = [
 
+    {
+    "name": "Rabies Exposure Risk",
+    "severity": "CRITICAL",
+    "exposure_any": ["dog bite", "cat bite", "monkey bite", "animal bite", "bat bite", "stray bite"],
+    "symptoms_any": ["bite wound", "scratch", "bleeding", "puncture"],
+    "weights": {"exposure": 3, "symptom": 2},
+    "min_required_weight": 3,
+    "reasoning": "Mammalian bite — rabies PEP urgently needed",
+},
+
+{
+    "name": "Tetanus Prone Wound",
+    "severity": "CRITICAL",
+    "exposure_any": ["puncture wound", "rusty nail", "dirty wound", "road traffic accident", "laceration", "farm injury", "old wound"],
+    "conditions_any": ["unvaccinated", "no tetanus", "unknown vaccine"],
+    "weights": {"exposure": 3, "condition": 2},
+    "min_required_weight": 3,
+    "reasoning": "Dirty/tetanus-prone wound without immunization",
+},
+
+{
+    "name": "Head Injury Red Flag",
+    "severity": "CRITICAL",
+    "exposure_any": ["head trauma", "head injury", "fall on head", "road traffic accident", "assault"],
+    "symptoms_any": ["vomiting", "loss of consciousness", "confusion", "drowsy", "seizure", "headache worsening", "bleeding ear", "bleeding nose"],
+    "meds_any": ["warfarin", "apixaban", "rivaroxaban", "clopidogrel", "aspirin"],
+    "weights": {"exposure": 2, "symptom": 2, "med": 2},
+    "min_required_weight": 4,
+    "reasoning": "Head trauma + red flag symptom or anticoagulant",
+},
+
+{
+    "name": "Compartment Syndrome",
+    "severity": "CRITICAL",
+    "exposure_any": ["fracture", "crush injury", "tight cast", "old accident"],
+    "symptoms_any": ["severe pain", "pain out of proportion", "numbness", "tingling", "pale", "cold limb", "cannot move fingers", "cannot move toes"],
+    "weights": {"exposure": 2, "symptom": 3},
+    "min_required_weight": 4,
+    "reasoning": "Trauma + pain/paresthesia/pallor — limb ischemia risk",
+},
+
+{
+    "name": "Occult Fracture Risk",
+    "severity": "HIGH",
+    "exposure_any": ["old accident", "fall", "twist", "trauma last week", "hairline"],
+    "symptoms_any": ["persistent pain", "localized tenderness", "swelling", "cannot bear weight", "limp"],
+    "weights": {"exposure": 2, "symptom": 2},
+    "min_required_weight": 3,
+    "reasoning": "History of trauma + ongoing localized pain — X-ray needed",
+},
+
+{
+    "name": "Major Burn",
+    "severity": "CRITICAL",
+    "exposure_any": ["burn", "scald", "flame", "electrical burn", "chemical burn"],
+    "symptoms_any": ["face burn", "hand burn", "genital burn", "circumferential", "blistering", "difficulty breathing", "hoarse voice"],
+    "weights": {"exposure": 2, "symptom": 3},
+    "min_required_weight": 4,
+    "reasoning": "Burn involving airway, face/hands, or large area",
+},
+
+{
+    "name": "Scorpion Envenomation",
+    "severity": "CRITICAL",
+    "exposure_any": ["scorpion sting", "scorpion bite"],
+    "symptoms_any": ["sweating", "vomiting", "restlessness", "cold extremities", "breathlessness", "priapism", "hypertension"],
+    "weights": {"exposure": 3, "symptom": 2},
+    "min_required_weight": 3,
+    "reasoning": "Scorpion sting + autonomic symptoms — common in rural India",
+},
     # -------------------------
     # MENINGITIS (2-of-3 triad)
     # -------------------------
@@ -29,8 +113,6 @@ RISK_PATTERNS = [
         "warning_any": ["fever", "febrile", "high temperature","light sensitivity", "photophobia"],
         "altered_mental": True,
         "weights": {"symptom": 3, "warning": 3, "mental": 3},
-        # 🔧 FIX: Increased threshold to prevent fever-only false positives
-        # Requires combination (fever + neck stiffness / mental change)
         "min_required_weight": 6,
         "reasoning": "Meningitis triad: neck stiffness + fever/confusion",
     },
@@ -75,7 +157,7 @@ RISK_PATTERNS = [
         "habits_any": ["smoking", "smoker"],
         "age_min": 50,
         "weights": {"symptom": 4, "condition": 1, "habit": 1, "age": 1},
-        "min_required_weight": 4,
+        "min_required_weight": 5,  # FIX: was 4, now requires 1 risk factor
         "reasoning": "Chest symptoms + cardiac risk factors",
     },
 
@@ -121,13 +203,11 @@ RISK_PATTERNS = [
 
     {
     "name": "Hypoglycemia",
-    "severity": "MEDIUM",  # 🔧 downgraded
+    "severity": "MEDIUM",
     "conditions_any": ["diabetes"],
-    "symptoms_any": ["confusion", "loss of consciousness", "seizure"],  # 🔧 stricter
+    "symptoms_any": ["confusion", "loss of consciousness", "seizure"],
     "meds_any": ["insulin", "glimepiride", "gliclazide"],
     "weights": {"symptom": 3, "med": 2},
-    # 🔧 FIX: Prevent false positives (confusion alone shouldn't trigger hypoglycemia)
-    # Requires BOTH medication exposure + neuro symptoms
     "min_required_weight": 5,
     "reasoning": "Diabetic on meds + neuroglycopenic symptoms",
     },
@@ -140,8 +220,8 @@ RISK_PATTERNS = [
     "severity": "CRITICAL",
     "symptoms_any": ["wheeze", "swelling face", "lip swelling", "hives"],
     "exposure_any": ["new drug", "injection", "food", "insect bite"],
-    "weights": {"symptom": 3, "exposure": 3},  # 🔧 stronger requirement
-    "min_required_weight": 4,  # 🔧 requires BOTH
+    "weights": {"symptom": 3, "exposure": 3},
+    "min_required_weight": 4,
     "reasoning": "Allergic reaction with airway involvement",
     },
 
@@ -153,7 +233,7 @@ RISK_PATTERNS = [
         "severity": "HIGH",
         "symptoms_any": ["fever", "high fever"],
         "warning_any": ["abdominal pain", "persistent vomiting", "bleeding gums", "nose bleed", "lethargy", "restlessness"],
-        "context_month": [6, 7, 8, 9, 10],  # optional
+        "context_month": [6, 7, 8, 9, 10],
         "weights": {"symptom": 2, "warning": 3, "season": 1},
         "min_required_weight": 4,
         "reasoning": "Fever + warning sign in monsoon",
@@ -180,7 +260,7 @@ RISK_PATTERNS = [
         "vitals_any": ["bp >180/120", "very high bp"],
         "symptoms_any": ["chest pain", "breathlessness", "confusion", "headache", "visual disturbance"],
         "weights": {"vital": 3, "symptom": 2},
-        "min_required_weight": 3,
+        "min_required_weight": 5,  # FIX: was 3, now requires BP + symptom
         "reasoning": "Severe BP + end-organ symptom",
     },
 
@@ -220,7 +300,7 @@ RISK_PATTERNS = [
         "symptoms_any": ["high fever", "confusion", "hot dry skin", "collapse"],
         "exposure_any": ["heat exposure", "outdoor work"],
         "weights": {"symptom": 3, "exposure": 2},
-        "min_required_weight": 3,
+        "min_required_weight": 5,  # FIX: was 3, now requires exposure
         "reasoning": "Heat exposure + CNS dysfunction",
     },
 
@@ -233,8 +313,71 @@ RISK_PATTERNS = [
         "conditions_any": ["pregnant", "pregnancy"],
         "symptoms_any": ["vaginal bleeding", "abdominal pain", "dizziness"],
         "weights": {"condition": 3, "symptom": 2},
-        "min_required_weight": 3,
+        "min_required_weight": 5,  # FIX: was 3, now requires symptom
         "reasoning": "Pregnant + bleeding or pain",
+    },
+
+    {
+        "name": "Ectopic Pregnancy Risk",
+        "severity": "CRITICAL",
+        "conditions_any": ["pregnant", "pregnancy"],
+        "symptoms_any": ["abdominal pain", "right side pain", "one sided pain", "spotting", "vaginal bleeding", "shoulder pain", "dizziness", "syncope"],
+        "weights": {"condition": 3, "symptom": 3},
+        "min_required_weight": 6,
+        "reasoning": "Pregnancy + unilateral pain/bleeding — ectopic until proven otherwise",
+    },
+
+    {
+        "name": "Pulmonary Embolism Risk",
+        "severity": "CRITICAL",
+        "symptoms_any": ["breathlessness", "shortness of breath", "chest pain", "cough blood"],
+        "vitals_any": ["tachycardia", "fast heart rate", "low oxygen", "hypoxia"],
+        "signs_any": ["leg swelling", "calf pain", "unilateral swelling"],
+        "weights": {"symptom": 2, "vital": 2, "sign": 2},
+        "min_required_weight": 4,
+        "reasoning": "Breathlessness + tachycardia/leg swelling",
+    },
+
+    {
+        "name": "Pre-eclampsia Risk",
+        "severity": "CRITICAL",
+        "conditions_any": ["pregnant", "pregnancy"],
+        "vitals_any": ["bp >140/90", "high bp", "hypertension"],
+        "symptoms_any": ["headache", "visual disturbance", "blurred vision", "swelling", "epigastric pain"],
+        "weights": {"condition": 2, "vital": 2, "symptom": 2},
+        "min_required_weight": 4,
+        "reasoning": "Pregnancy + hypertension + end-organ symptom",
+    },
+
+    {
+        "name": "Acute Liver Failure",
+        "severity": "CRITICAL",
+        "symptoms_any": ["jaundice", "yellow eyes", "confusion", "drowsy", "bleeding"],
+        "conditions_any": ["hepatitis", "liver disease"],
+        "habits_any": ["alcohol"],
+        "weights": {"symptom": 3, "condition": 1, "habit": 1},
+        "min_required_weight": 4,
+        "reasoning": "Jaundice + encephalopathy/coagulopathy",
+    },
+
+    {
+        "name": "Snake Envenomation",
+        "severity": "CRITICAL",
+        "exposure_any": ["snake bite", "snakebite", "unknown bite"],
+        "symptoms_any": ["ptosis", "difficulty breathing", "bleeding gums", "swelling", "pain"],
+        "weights": {"exposure": 3, "symptom": 2},
+        "min_required_weight": 3,
+        "reasoning": "Snake exposure + neurotoxic/hemotoxic signs",
+    },
+
+    {
+        "name": "Upper GI Bleed",
+        "severity": "CRITICAL",
+        "symptoms_any": ["vomiting blood", "hematemesis", "black stools", "melena"],
+        "vitals_any": ["hypotension", "low bp", "tachycardia"],
+        "weights": {"symptom": 3, "vital": 2},
+        "min_required_weight": 3,
+        "reasoning": "Hematemesis/melena + hemodynamic instability",
     },
 
     # -------------------------
@@ -267,7 +410,7 @@ RISK_PATTERNS = [
         "min_required_weight": 3,
         "reasoning": "Opioid + benzodiazepine",
     },
-    ]
+]
 
 
 # -----------------------------
@@ -497,12 +640,12 @@ def run_hard_rules(structured_input: Dict) -> List[RuleMatch]:
             if r.flag == "Hypoglycemia":
                 r.severity = "MEDIUM"
 
-    # 🔧 CONTROL: Avoid too many CRITICAL flags (alarm fatigue)
+        # 🔧 CONTROL: Avoid too many CRITICAL flags (alarm fatigue)
     critical_count = sum(1 for r in results if r.severity == "CRITICAL")
 
     if critical_count > 2:
         for r in results:
-            if r.flag not in ["Probable ACS", "Possible Stroke", "Sepsis Risk"]:
+            if r.flag not in ALWAYS_CRITICAL:
                 if r.severity == "CRITICAL":
                     r.severity = "HIGH"
 
@@ -510,7 +653,7 @@ def run_hard_rules(structured_input: Dict) -> List[RuleMatch]:
     # 🔧 FINAL SAFETY GUARD
     # Prevent accidental CRITICAL escalation
     # ==============================
-    if not any(r.flag in ["Probable ACS", "Possible Stroke", "Sepsis Risk", "Hypotension"] for r in results):
+    if not any(r.flag in ALWAYS_CRITICAL for r in results):
         for r in results:
             if r.severity == "CRITICAL":
                 r.severity = "HIGH"
