@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
 import TopNavBar from '../components/TopNavBar';
 import Footer from '../components/Footer';
 
@@ -149,34 +148,62 @@ export default function Analysis() {
     const [loading, setLoading] = useState(false);
 
     async function runAnalysis() {
-        if (!caseText.trim() || loading) return;
-        setResult(null);
-        setLoading(true);
+    if (!caseText.trim() || loading) return;
+    setResult(null);
+    setLoading(true);
+    setAgentStatuses({ intake: 'PROCESSING', ddx: 'IDLE', redflag: 'IDLE', consist: 'IDLE', summary: 'IDLE' });
 
-        const seq = async (updates, delayMs) => {
-            await new Promise(r => setTimeout(r, delayMs));
-            setAgentStatuses(prev => ({ ...prev, ...updates }));
-        };
+    try {
+        const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+        const response = await fetch(`${API}/analyze/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ case: caseText }),
+        });
 
-        setAgentStatuses({ intake: 'PROCESSING', ddx: 'IDLE', redflag: 'IDLE', consist: 'IDLE', summary: 'IDLE' });
-        await seq({ intake: 'COMPLETED', ddx: 'PROCESSING', redflag: 'ANALYZING' }, 900);
-        await seq({ ddx: 'COMPLETED', redflag: 'COMPLETED', consist: 'PROCESSING' }, 1800);
-        await seq({ consist: 'COMPLETED', summary: 'PROCESSING' }, 900);
-        await seq({ summary: 'COMPLETED' }, 700);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-        try {
-            const res = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/analyze`, { case: caseText }, { timeout: 60000 }); setResult(transformApiResponse(res.data));
-            console.log("API RESPONSE:", res.data);
-            console.log("TRANSFORMED:", transformApiResponse(res.data));
-        } catch (err) {
-            console.error("API failed:", err);
-            setResult(null); // falls back to DEMO_RESULT
-        } finally {
-            setLoading(false);
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop() || '';
+
+            for (const event of events) {
+                if (!event.trim()) continue;
+
+                const eventType = event.match(/event: (\w+)/)?.[1];
+                const dataMatch = event.match(/data: (.+)/);
+                if (!dataMatch) continue;
+
+                const data = JSON.parse(dataMatch[1]);
+
+                if (eventType === 'status') {
+                    setAgentStatuses(prev => ({
+                       ...prev,
+                        [data.agent]: data.status === 'PROCESSING'? 'PROCESSING' : 'COMPLETED'
+                    }));
+                }
+
+                if (eventType === 'result') {
+                    setResult(transformApiResponse(data));
+                }
+            }
         }
+    } catch (err) {
+        console.error("Stream failed:", err);
+        setResult(null);
+        setAgentStatuses({ intake: 'IDLE', ddx: 'IDLE', redflag: 'IDLE', consist: 'IDLE', summary: 'IDLE' });
+    } finally {
+        setLoading(false);
     }
+}
 
-    const r = result ?? DEMO_RESULT;
+    const r = result;
     console.log("FINAL R:", r);
 
     return (

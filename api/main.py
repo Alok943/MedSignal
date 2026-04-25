@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime, timezone
 from langchain_openai import ChatOpenAI
-
+from fastapi.responses import StreamingResponse
+import json
 from agents.intake_agent import run_intake
 from crew.medsignal_crew import run_medsignal_crew
 from agents.summary_agent import FinalReport
@@ -170,57 +171,67 @@ async def health_check():
 
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze_case(request: CaseRequest):
-    """
-    Main entry point for MedSignal Multi-Agent pipeline.
-    """
-
+    """Main entry point (non-streaming, kept for compatibility)."""
     case_text = request.case.strip()
-
     if not case_text:
         raise HTTPException(status_code=400, detail="Patient case description cannot be empty.")
-
     if len(case_text) > 2000:
         raise HTTPException(status_code=400, detail="Input too long")
-
     try:
         llm = get_llm()
-
-        # ── Stage 1: Intake ───────────────────────────────
-        logger.debug(f"Intake starting for: {case_text[:80]}")
         structured_data = await asyncio.to_thread(run_intake, llm, case_text)
-
         if "error" in structured_data:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Intake Agent failed: {structured_data['error']}"
-            )
-
-        logger.debug(f"Intake complete. Quality={structured_data.get('data_quality')}")
-
-        # ── Stages 2–5: Crew ─────────────────────────────
-        try:
-            final_report = await asyncio.to_thread(
-                        run_medsignal_crew, llm, structured_data
-            )
-        except asyncio.TimeoutError:
-            logger.error("Pipeline timeout")
-            raise HTTPException(status_code=500, detail="Processing timeout")
-
+            raise HTTPException(status_code=422, detail=f"Intake Agent failed: {structured_data['error']}")
+        final_report = await asyncio.to_thread(run_medsignal_crew, llm, structured_data)
         return _to_response(final_report)
-
     except HTTPException:
         raise
     except Exception as e:
         msg = str(e)
         logger.error(f"API error: {msg}", exc_info=True)
-    
-    # surface provider overload cleanly
         if "503" in msg or "UNAVAILABLE" in msg or "high demand" in msg:
-            raise HTTPException(
-                status_code=503, 
-                detail="LLM provider overloaded. Retry in 10s or set LLM_PROVIDER=groq in .env"
-        )
+            raise HTTPException(status_code=503, detail="LLM provider overloaded. Retry in 10s")
         raise HTTPException(status_code=500, detail="Internal processing error")
+
+@app.post("/analyze/stream")
+async def analyze_stream(request: CaseRequest):
+    """Streaming version — sends SSE events as each agent completes."""
+    case_text = request.case.strip()
+    if not case_text:
+        raise HTTPException(status_code=400, detail="Empty case")
+
+    async def event_generator():
+        llm = get_llm()
+
+        # 1. Intake
+        yield f"event: status\ndata: {json.dumps({'agent': 'intake', 'status': 'PROCESSING'})}\n\n"
+        structured_data = await asyncio.to_thread(run_intake, llm, case_text)
+        yield f"event: status\ndata: {json.dumps({'agent': 'intake', 'status': 'COMPLETED'})}\n\n"
+
+        # 2. Start parallel agents
+        for agent in ['ddx', 'redflag', 'consist']:
+            yield f"event: status\ndata: {json.dumps({'agent': agent, 'status': 'PROCESSING'})}\n\n"
+
+        # 3. Run crew (this takes 15-30s)
+        final_report = await asyncio.to_thread(run_medsignal_crew, llm, structured_data)
+
+        # 4. Mark parallel agents complete
+        for agent in ['ddx', 'redflag', 'consist']:
+            yield f"event: status\ndata: {json.dumps({'agent': agent, 'status': 'COMPLETED'})}\n\n"
+
+        # 5. Summary
+        yield f"event: status\ndata: {json.dumps({'agent': 'summary', 'status': 'PROCESSING'})}\n\n"
+        await asyncio.sleep(0.2) # tiny visual pause
+        yield f"event: status\ndata: {json.dumps({'agent': 'summary', 'status': 'COMPLETED'})}\n\n"
+
+        # 6. Final result
+        response_data = _to_response(final_report).model_dump()
+        yield f"event: result\ndata: {json.dumps(response_data)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+    })
 
 
 @app.post("/intake-only", response_model=dict)
