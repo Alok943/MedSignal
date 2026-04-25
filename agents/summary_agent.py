@@ -92,6 +92,7 @@ Rules for recommendations:
 - Only recommend CT for PE if breathlessness, hypoxia, or DVT signs are present
 
 - Only recommend LP if meningitis signs (fever + neck stiffness + altered mental status) are present
+- For Snake Envenomation: first action must be "Immobilize limb, no tourniquet, no incision, transport rapidly", second must be "Perform 20-min WBCT, CBC, PT/INR", third "Administer antivenom if WBCT positive or systemic signs"
 
 - Reference specific diagnoses or flags explicitly
 
@@ -323,6 +324,11 @@ def _fallback_recommendations(red_flags: RedFlagOutput) -> List[str]:
         elif "adrenal" in flag_lower:
             recs.append("Administer IV hydrocortisone immediately")
 
+        elif "snake" in flag_lower or "envenomation" in flag_lower:
+            recs.append("Immobilize limb, no tourniquet, no incision, transport rapidly")
+            recs.append("Perform 20-min WBCT, CBC, PT/INR")
+            recs.append("Administer antivenom if WBCT positive or systemic signs")
+            
     # 3. Investigations
     for f in red_flags.red_flags:
         flag_lower = f.flag.lower()
