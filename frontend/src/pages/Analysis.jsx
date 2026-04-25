@@ -99,7 +99,7 @@ function AgentRow({ agent, status }) {
 }
 
 function transformApiResponse(data) {
-    if (!data) return null; // <-- ADD THIS
+    if (!data) return null;
 
     const probColor = { HIGH: '#ED1C24', MEDIUM: '#f97316', LOW: '#fbbf24' };
     const topCondition = data.differential?.[0]?.condition || 'Unknown';
@@ -109,13 +109,13 @@ function transformApiResponse(data) {
         severity: sev,
         headline: topCondition,
         subheadline: sev === 'CRITICAL'
-           ? 'Critical risk detected — urgent evaluation required'
+            ? 'Critical risk detected — urgent evaluation required'
             : sev === 'HIGH'
-               ? 'High-risk features present — prompt evaluation needed'
+                ? 'High-risk features present — prompt evaluation needed'
                 : 'Risk factors identified — clinical review recommended',
         dataQuality: data.data_quality || 'UNKNOWN',
         dataQualityNote: data.consistency_notes?.length
-           ? `(${data.consistency_notes.length} consistency issue(s) found)`
+            ? `(${data.consistency_notes.length} consistency issue(s) found)`
             : '(based on available data)',
         redFlags: data.red_flags || [], // backend sends snake_case
         differential: data.differential?.map((d, i) => ({
@@ -128,7 +128,7 @@ function transformApiResponse(data) {
         })) || [],
         actions: data.recommendations || [],
         missing: data.consistency_notes?.length
-           ? data.consistency_notes
+            ? data.consistency_notes
             : ['No major data gaps detected'],
         requires_verification: data.requires_verification || false,
     };
@@ -151,75 +151,81 @@ export default function Analysis() {
     const [loading, setLoading] = useState(false);
 
     async function runAnalysis() {
-    if (!caseText.trim() || loading) return;
-    setResult(null);
-    setLoading(true);
-    setAgentStatuses({ intake: 'PROCESSING', ddx: 'IDLE', redflag: 'IDLE', consist: 'IDLE', summary: 'IDLE' });
+        if (!caseText.trim() || loading) return;
+        setResult(null);
+        setLoading(true);
+        setAgentStatuses({ intake: 'PROCESSING', ddx: 'IDLE', redflag: 'IDLE', consist: 'IDLE', summary: 'IDLE' });
 
-    // Analytics - safe metadata only
-    track('analyze_started', { case_length: caseText.length });
-    const startTime = Date.now();
+        // Analytics - safe metadata only
+        track('analyze_started', { case_length: caseText.length });
+        const startTime = Date.now();
 
-    try {
-        const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-        const response = await fetch(`${API}/analyze/stream`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ case: caseText }),
-        });
+        try {
+            const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+            const response = await fetch(`${API}/analyze/stream`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ case: caseText }),
+            });
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const events = buffer.split('\n\n');
-            buffer = events.pop() || '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const events = buffer.split('\n\n');
+                buffer = events.pop() || '';
 
-            for (const event of events) {
-                if (!event.trim()) continue;
-                const eventType = event.match(/event: (\w+)/)?.[1];
-                const dataMatch = event.match(/data: (.+)/);
-                if (!dataMatch) continue;
-                const data = JSON.parse(dataMatch[1]);
+                for (const event of events) {
+                    if (!event.trim()) continue;
+                    const eventType = event.match(/event: (\w+)/)?.[1];
+                    const dataMatch = event.match(/data: (.+)/);
+                    if (!dataMatch) continue;
+                    const data = JSON.parse(dataMatch[1]);
 
-                if (eventType === 'status') {
-                    setAgentStatuses(prev => ({
-                      ...prev,
-                        [data.agent]: data.status === 'PROCESSING'? 'PROCESSING' : 'COMPLETED'
-                    }));
-                }
-                if (eventType === 'result') {
-                    if (data) {
-                        setResult(transformApiResponse(data));
+                    if (eventType === 'status') {
+                        setAgentStatuses(prev => ({
+                            ...prev,
+                            [data.agent]: data.status === 'PROCESSING' ? 'PROCESSING' : 'COMPLETED'
+                        }));
+                    }
+                    if (eventType === 'result') {
+                        if (data) {
+                            setResult(transformApiResponse(data));
                         }
-                    const duration = Date.now() - startTime;
-                    track('analyze_completed', {
-                        severity: data.severity,
-                        red_flag_count: data.red_flags?.length || 0,
-                        data_quality: data.data_quality,
-                        duration_ms: duration,
-                    });
-                    setResult(transformApiResponse(data));
+                        const duration = Date.now() - startTime;
+                        track('analyze_completed', {
+                            severity: data.severity,
+                            red_flag_count: data.red_flags?.length || 0,
+                            data_quality: data.data_quality,
+                            duration_ms: duration,
+                        });
+                        setResult(transformApiResponse(data));
+                    }
                 }
             }
+        } catch (err) {
+            track('analyze_failed');
+            console.error("Stream failed:", err);
+            setResult(null);
+            setAgentStatuses({ intake: 'IDLE', ddx: 'IDLE', redflag: 'IDLE', consist: 'IDLE', summary: 'IDLE' });
+        } finally {
+            setLoading(false);
         }
-    } catch (err) {
-        track('analyze_failed');
-        console.error("Stream failed:", err);
-        setResult(null);
-        setAgentStatuses({ intake: 'IDLE', ddx: 'IDLE', redflag: 'IDLE', consist: 'IDLE', summary: 'IDLE' });
-    } finally {
-        setLoading(false);
     }
-}
 
-    const r = result?? DEMO_RESULT;
+    const r = result;
     console.log("FINAL R:", r);
-
+    const severityConfig = {
+        CRITICAL: { color: '#ffb4ab', border: 'rgba(255,180,171,0.6)', shadow: 'rgba(255,180,171,0.1)', label: 'CRITICAL' },
+        HIGH: { color: '#f97316', border: 'rgba(249,115,22,0.6)', shadow: 'rgba(249,115,22,0.1)', label: 'HIGH RISK' },
+        MEDIUM: { color: '#fbbf24', border: 'rgba(251,191,36,0.6)', shadow: 'rgba(251,191,36,0.1)', label: 'MODERATE RISK' },
+        LOW: { color: '#22c55e', border: 'rgba(34,197,94,0.6)', shadow: 'rgba(34,197,94,0.1)', label: 'LOW RISK' },
+    };
+    const sev = severityConfig[r.severity] || severityConfig.LOW;
     return (
         <div style={{ minHeight: '100vh', position: 'relative' }}>
             <TopNavBar />
@@ -295,20 +301,20 @@ export default function Analysis() {
                                     borderBottom: '1px solid rgba(31,54,81,0.8)', paddingBottom: '16px'
                                 }}>
                                 <div style={{
-                                    border: '1px solid rgba(255,180,171,0.6)', padding: '16px 20px',
-                                    boxShadow: '0 0 15px rgba(255,180,171,0.1)', flex: 1
+                                    border: `1px solid ${sev.border}`, padding: '16px 20px',
+                                    boxShadow: `0 0 15px ${sev.shadow}`, flex: 1
                                 }}>
                                     <div style={{
                                         fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: '22px',
-                                        color: '#ffb4ab', display: 'flex', alignItems: 'center', gap: '8px'
+                                        color: sev.color, display: 'flex', alignItems: 'center', gap: '8px'
                                     }}>
-                                        {r.severity === 'CRITICAL' ? '🚨' : r.severity === 'HIGH' ? '⚠️' : 'ℹ️'} {r.severity}: {r.headline}
+                                        {sev.label}: {r.headline}
                                     </div>
                                     <div style={{
                                         fontFamily: "'Space Grotesk',sans-serif", fontSize: '16px',
-                                        color: '#ff544b', opacity: 0.9, marginTop: '4px'
+                                        color: sev.color, opacity: 0.9, marginTop: '4px'
                                     }}>
-                                        ⚠ {r.subheadline}
+                                        {r.subheadline}
                                     </div>
                                 </div>
                                 <div style={{
@@ -331,16 +337,7 @@ export default function Analysis() {
                             <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>flag</span>
                             Red Flags
                         </div>
-                        {/* CHANGED: removed duplicate headline, now shows concise label */}
-                        <div style={{
-                            fontFamily: "'JetBrains Mono'",
-                            fontWeight: 700,
-                            fontSize: '13px',
-                            color: '#ff544b',
-                            marginBottom: '8px'
-                        }}>
-                            Key Risk Indicators:
-                        </div>
+                        
                         <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {(r.red_flags || r.redFlags)?.map((f, i) => (
                                 <li key={i} style={{
@@ -379,7 +376,7 @@ export default function Analysis() {
                         }}>
                             <thead>
                                 <tr>
-                                    <th style={{ width: '8%', textAlign: 'left', padding: '4px 8px', color: '#8991a2' }}>RNK</th>
+                                    <th style={{ width: '8%', textAlign: 'left', padding: '4px 8px', color: '#8991a2' }}>RANK</th>
                                     <th style={{ width: '52%', textAlign: 'left', padding: '4px 8px', color: '#8991a2' }}>Condition & Reasoning</th>
                                     <th style={{ width: '20%', textAlign: 'right', padding: '4px 8px', color: '#8991a2' }}>Probability</th>
                                     <th style={{ width: '20%', textAlign: 'right', padding: '4px 8px', color: '#8991a2' }}>Action</th>
@@ -420,7 +417,7 @@ export default function Analysis() {
                                                 color: '#8991a2',
                                                 lineHeight: 1.5
                                             }}>
-                                                → {d.reasoning}
+                                                → {d.reasoning.replace(/\w+:/g, '').replace(/\+/g, '·').trim()}
                                             </div>
                                         </td>
                                         <td style={{
