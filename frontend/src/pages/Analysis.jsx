@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TopNavBar from '../components/TopNavBar';
 import Footer from '../components/Footer';
+import { track } from '@vercel/analytics';
 
 const DEMO_RESULT = {
     severity: 'CRITICAL',
