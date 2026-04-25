@@ -301,7 +301,7 @@ export default function Analysis() {
                             Key Risk Indicators:
                         </div>
                         <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {r.redFlags?.map((f, i) => (
+                            {(r.red_flags || r.redFlags)?.map((f, i) => (
                                 <li key={i} style={{
                                     display: 'flex',
                                     alignItems: 'flex-start',
@@ -312,7 +312,7 @@ export default function Analysis() {
                                 }}>
                                     <span style={{ color: '#ED1C24', fontWeight: 700, fontSize: '18px', lineHeight: 1 }}>—</span>
                                     <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '13px', color: 'var(--text)' }}>
-                                        {f.flag}
+                                        {typeof f === 'string' ? f : f.flag}
                                     </span>
                                 </li>
                             ))}

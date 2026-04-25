@@ -273,6 +273,10 @@ def run_summary(
     try:
         raw_text = getattr(result, "raw", None) or getattr(result, "output", None) or str(result)
         cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw_text).strip()
+        # Try to extract JSON object if LLM wrapped it in prose
+        json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+        if json_match:
+            cleaned = json_match.group(0)
         
         if not cleaned:  # ← this catches the empty case you hit
             raise ValueError("Empty LLM response")

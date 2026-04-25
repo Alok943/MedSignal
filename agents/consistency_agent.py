@@ -166,7 +166,7 @@ Return JSON only.
 # Timeout wrapper
 # =============================
 
-def _run_with_timeout(crew, timeout=10):
+def _run_with_timeout(crew, timeout=25):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future = executor.submit(crew.kickoff)
         try:
@@ -263,7 +263,7 @@ def run_consistency(llm, structured_data: dict) -> ConsistencyOutput:
 
     crew = Crew(agents=[agent], tasks=[task], verbose=False)
 
-    result = _run_with_timeout(crew, timeout=10)
+    result = _run_with_timeout(crew, timeout=25)
 
     if result is None:
         return ConsistencyOutput(

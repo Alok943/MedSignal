@@ -438,7 +438,7 @@ def _parse_red_flag_safe(raw: str, prefilled: List[dict]) -> RedFlagOutput:
 # =============================
 import concurrent.futures
 
-def _run_with_timeout(crew, timeout=10):
+def _run_with_timeout(crew, timeout=25):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future = executor.submit(crew.kickoff)
         try:
