@@ -193,46 +193,28 @@ async def analyze_case(request: CaseRequest):
             raise HTTPException(status_code=503, detail="LLM provider overloaded. Retry in 10s")
         raise HTTPException(status_code=500, detail="Internal processing error")
 
+
 @app.post("/analyze/stream")
 async def analyze_stream(request: CaseRequest):
-    """Streaming version — sends SSE events as each agent completes."""
-    case_text = request.case.strip()
-    if not case_text:
-        raise HTTPException(status_code=400, detail="Empty case")
-
     async def event_generator():
         llm = get_llm()
+        yield f"event: status\ndata: {json.dumps({'agent':'intake','status':'PROCESSING'})}\n\n"
+        structured = await asyncio.to_thread(run_intake, llm, request.case)
+        yield f"event: status\ndata: {json.dumps({'agent':'intake','status':'COMPLETED'})}\n\n"
 
-        # 1. Intake
-        yield f"event: status\ndata: {json.dumps({'agent': 'intake', 'status': 'PROCESSING'})}\n\n"
-        structured_data = await asyncio.to_thread(run_intake, llm, case_text)
-        yield f"event: status\ndata: {json.dumps({'agent': 'intake', 'status': 'COMPLETED'})}\n\n"
+        for a in ['ddx','redflag','consist']:
+            yield f"event: status\ndata: {json.dumps({'agent':a,'status':'PROCESSING'})}\n\n"
 
-        # 2. Start parallel agents
-        for agent in ['ddx', 'redflag', 'consist']:
-            yield f"event: status\ndata: {json.dumps({'agent': agent, 'status': 'PROCESSING'})}\n\n"
+        final = await asyncio.to_thread(run_medsignal_crew, llm, structured)
 
-        # 3. Run crew (this takes 15-30s)
-        final_report = await asyncio.to_thread(run_medsignal_crew, llm, structured_data)
+        for a in ['ddx','redflag','consist']:
+            yield f"event: status\ndata: {json.dumps({'agent':a,'status':'COMPLETED'})}\n\n"
 
-        # 4. Mark parallel agents complete
-        for agent in ['ddx', 'redflag', 'consist']:
-            yield f"event: status\ndata: {json.dumps({'agent': agent, 'status': 'COMPLETED'})}\n\n"
+        yield f"event: status\ndata: {json.dumps({'agent':'summary','status':'PROCESSING'})}\n\n"
+        yield f"event: status\ndata: {json.dumps({'agent':'summary','status':'COMPLETED'})}\n\n"
+        yield f"event: result\ndata: {json.dumps(_to_response(final).model_dump())}\n\n"
 
-        # 5. Summary
-        yield f"event: status\ndata: {json.dumps({'agent': 'summary', 'status': 'PROCESSING'})}\n\n"
-        await asyncio.sleep(0.2) # tiny visual pause
-        yield f"event: status\ndata: {json.dumps({'agent': 'summary', 'status': 'COMPLETED'})}\n\n"
-
-        # 6. Final result
-        response_data = _to_response(final_report).model_dump()
-        yield f"event: result\ndata: {json.dumps(response_data)}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-    })
-
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.post("/intake-only", response_model=dict)
 async def intake_only(request: CaseRequest):

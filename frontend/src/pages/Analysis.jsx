@@ -153,6 +153,10 @@ export default function Analysis() {
     setLoading(true);
     setAgentStatuses({ intake: 'PROCESSING', ddx: 'IDLE', redflag: 'IDLE', consist: 'IDLE', summary: 'IDLE' });
 
+    // Analytics - safe metadata only
+    track('analyze_started', { case_length: caseText.length });
+    const startTime = Date.now();
+
     try {
         const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
         const response = await fetch(`${API}/analyze/stream`, {
@@ -168,33 +172,37 @@ export default function Analysis() {
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-
             buffer += decoder.decode(value, { stream: true });
             const events = buffer.split('\n\n');
             buffer = events.pop() || '';
 
             for (const event of events) {
                 if (!event.trim()) continue;
-
                 const eventType = event.match(/event: (\w+)/)?.[1];
                 const dataMatch = event.match(/data: (.+)/);
                 if (!dataMatch) continue;
-
                 const data = JSON.parse(dataMatch[1]);
 
                 if (eventType === 'status') {
                     setAgentStatuses(prev => ({
-                       ...prev,
+                      ...prev,
                         [data.agent]: data.status === 'PROCESSING'? 'PROCESSING' : 'COMPLETED'
                     }));
                 }
-
                 if (eventType === 'result') {
+                    const duration = Date.now() - startTime;
+                    track('analyze_completed', {
+                        severity: data.severity,
+                        red_flag_count: data.red_flags?.length || 0,
+                        data_quality: data.data_quality,
+                        duration_ms: duration,
+                    });
                     setResult(transformApiResponse(data));
                 }
             }
         }
     } catch (err) {
+        track('analyze_failed');
         console.error("Stream failed:", err);
         setResult(null);
         setAgentStatuses({ intake: 'IDLE', ddx: 'IDLE', redflag: 'IDLE', consist: 'IDLE', summary: 'IDLE' });
