@@ -490,7 +490,7 @@ def evaluate_pattern(pattern: Dict[str, Any], data: Dict[str, Any]):
         signals["warning"] = True
 
     # exposure
-    if "exposure_any" in pattern and match_any(symptoms + habits, pattern["exposure_any"]):
+    if "exposure_any" in pattern and match_any(symptoms + habits + conditions, pattern["exposure_any"]):
         matched_weight += pattern["weights"].get("exposure", 0)
         signals["exposure"] = True
 
