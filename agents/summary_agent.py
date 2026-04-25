@@ -263,13 +263,25 @@ def run_summary(
     )
 
     crew = Crew(agents=[agent], tasks=[task], verbose=False)
-    result = _run_with_timeout(crew)
+    result = None
+    for attempt in range(3):
+        result = _run_with_timeout(crew, timeout=20)
+        if result is not None:
+            raw_text = getattr(result, "raw", None) or ""
+            if raw_text.strip() and raw_text.strip().lower() != "none":
+                break
+        logger.warning(f"Summary agent attempt {attempt+1} failed, retrying...")
 
     # Timeout fallback
     if result is None:
         report.recommendations = _fallback_recommendations(red_flags)
         return report
-
+   # — catches bad result after retries
+    raw_check = getattr(result, "raw", None) or ""
+    if not raw_check.strip() or raw_check.strip().lower() == "none":
+        report.recommendations = _fallback_recommendations(red_flags)
+        return report
+    
     # Parse recommendations
     try:
         raw_text = getattr(result, "raw", None) or getattr(result, "output", None) or str(result)
