@@ -202,6 +202,9 @@ async def analyze_stream(request: CaseRequest):
         structured = await asyncio.to_thread(run_intake, llm, request.case)
         yield f"event: status\ndata: {json.dumps({'agent':'intake','status':'COMPLETED'})}\n\n"
 
+        if "error" in structured or structured.get("data_quality") == "UNKNOWN":
+            yield f"event: error\ndata: {json.dumps({'message': 'Intake failed. Please retry.'})}\n\n"
+            return
         for a in ['ddx','redflag','consist']:
             yield f"event: status\ndata: {json.dumps({'agent':a,'status':'PROCESSING'})}\n\n"
 
