@@ -98,23 +98,25 @@ function AgentRow({ agent, status }) {
 }
 
 function transformApiResponse(data) {
+    if (!data) return null; // <-- ADD THIS
+
     const probColor = { HIGH: '#ED1C24', MEDIUM: '#f97316', LOW: '#fbbf24' };
     const topCondition = data.differential?.[0]?.condition || 'Unknown';
-    const sev = data.severity;
+    const sev = data.severity || 'UNKNOWN';
 
     return {
         severity: sev,
         headline: topCondition,
         subheadline: sev === 'CRITICAL'
-            ? 'Critical risk detected — urgent evaluation required'
+           ? 'Critical risk detected — urgent evaluation required'
             : sev === 'HIGH'
-                ? 'High-risk features present — prompt evaluation needed'
+               ? 'High-risk features present — prompt evaluation needed'
                 : 'Risk factors identified — clinical review recommended',
-        dataQuality: data.data_quality,
+        dataQuality: data.data_quality || 'UNKNOWN',
         dataQualityNote: data.consistency_notes?.length
-            ? `(${data.consistency_notes.length} consistency issue(s) found)`
+           ? `(${data.consistency_notes.length} consistency issue(s) found)`
             : '(based on available data)',
-        redFlags: data.red_flags || [],
+        redFlags: data.red_flags || [], // backend sends snake_case
         differential: data.differential?.map((d, i) => ({
             rank: String(i + 1).padStart(2, '0'),
             condition: d.condition,
@@ -125,9 +127,9 @@ function transformApiResponse(data) {
         })) || [],
         actions: data.recommendations || [],
         missing: data.consistency_notes?.length
-            ? data.consistency_notes
+           ? data.consistency_notes
             : ['No major data gaps detected'],
-        requires_verification: data.requires_verification,
+        requires_verification: data.requires_verification || false,
     };
 }
 
@@ -190,6 +192,9 @@ export default function Analysis() {
                     }));
                 }
                 if (eventType === 'result') {
+                    if (data) {
+                        setResult(transformApiResponse(data));
+                        }
                     const duration = Date.now() - startTime;
                     track('analyze_completed', {
                         severity: data.severity,
@@ -211,7 +216,7 @@ export default function Analysis() {
     }
 }
 
-    const r = result;
+    const r = result?? DEMO_RESULT;
     console.log("FINAL R:", r);
 
     return (
