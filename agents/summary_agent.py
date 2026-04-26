@@ -300,7 +300,8 @@ def run_summary(
             json_match = re.search(r'\{[^{}]*\}', cleaned)  # fallback: first simple object
         
         
-    
+        logger.warning(f"Cleaned before json.loads: {repr(cleaned)}")  # ← add this
+        
         recs_data = json.loads(cleaned)
         recs = recs_data.get("recommendations", [])[:6]
         report.recommendations = recs if recs else _fallback_recommendations(red_flags)
