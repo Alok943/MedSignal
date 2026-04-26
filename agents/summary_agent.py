@@ -266,6 +266,7 @@ def run_summary(
     result = None
     for attempt in range(3):
         result = _run_with_timeout(crew, timeout=20)
+        logger.warning(f"Attempt {attempt+1} raw result: {repr(getattr(result, 'raw', None))}")
         if result is not None:
             raw_text = getattr(result, "raw", None) or ""
             if raw_text.strip() and raw_text.strip().lower() != "none":
