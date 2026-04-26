@@ -289,19 +289,21 @@ def run_summary(
         
         if not raw_text or raw_text.strip().lower() == "none":
             raise ValueError("Empty LLM response")
+        
         cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw_text).strip()
-        
-        if not cleaned:  # ← this catches the empty case you hit
+
+        if not cleaned or cleaned.lower() == "none":
             raise ValueError("Empty LLM response")
-        
-        # Try to extract JSON object if LLM wrapped it in prose
-        json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+
+        # extract JSON object — handles prose before/after
+        json_match = re.search(r'\{[^{}]*\}', cleaned, re.DOTALL) or \
+             re.search(r'\{.*\}', cleaned, re.DOTALL)
+
         if not json_match:
-            json_match = re.search(r'\{[^{}]*\}', cleaned)  # fallback: first simple object
-        
-        
-        logger.warning(f"Cleaned before json.loads: {repr(cleaned)}")  # ← add this
-        
+            raise ValueError("No JSON found in response")
+
+        cleaned = json_match.group(0).strip()
+        logger.warning(f"Cleaned before json.loads: {repr(cleaned)}")
         recs_data = json.loads(cleaned)
         recs = recs_data.get("recommendations", [])[:6]
         report.recommendations = recs if recs else _fallback_recommendations(red_flags)
