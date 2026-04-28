@@ -148,11 +148,26 @@ def _assemble_without_llm(
 
     # Consistency notes
     consistency_notes = [
-    f"Contradiction: {c.description}" for c in consistency.contradictions[:3]
+        f"Contradiction: {c.description}" for c in consistency.contradictions[:3]
     ]
     consistency_notes += [
-    f"Missing: {g}" for g in consistency.data_gaps[:3]
+        f"Missing: {g}" for g in consistency.data_gaps[:3]
     ]
+
+    # Pull missing fields from intake agent (most reliable source)
+    for field in intake_data.get("missing_fields", [])[:3]:
+        note = f"Missing: {field.replace('_', ' ').title()}"
+        if note not in consistency_notes:
+            consistency_notes.append(note)
+
+    # Pull missing data flags from red flag agent (catches consolidated flags)
+    for f in red_flags.red_flags:
+        flag_lower = f.flag.lower()
+        if flag_lower.startswith("missing"):
+        # Extract the field portion: "Missing key data (duration, vitals)" → "Key data: duration, vitals"
+            note = f"Missing: {f.flag[len('Missing: '):].strip()}" if ": " in f.flag else f.flag
+            if note not in consistency_notes:
+                consistency_notes.append(note)
     
     # 🔧 SAFETY: no red flags → LOW severity
     if not rf_items:
