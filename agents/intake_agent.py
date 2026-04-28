@@ -291,6 +291,8 @@ def run_intake(llm, patient_input: str) -> Dict[str, Any]:
         raw = re.sub(r"```(?:json)?|```", "", raw_text).strip()
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         raw = match.group(0) if match else raw
+        raw = re.sub(r',\s*([}\]])', r'\1', raw)   # trailing commas
+        raw = re.sub(r'"\s*\n\s*"', '", "', raw)   # missing comma between string items
         data = json.loads(raw)   # ← use raw, not str(result)
     except Exception as e:
         print(f"[ERROR] Invalid JSON: {e}")

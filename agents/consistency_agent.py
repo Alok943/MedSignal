@@ -181,6 +181,8 @@ def _run_with_timeout(crew, timeout=25):
 
 def _parse_consistency_safe(raw: str, precheck: List[dict]) -> ConsistencyOutput:
     cleaned = re.sub(r'```(?:json)?|```', '', str(raw)).strip()
+    cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)   # trailing commas
+    cleaned = re.sub(r'"\s*\n\s*"', '", "', cleaned)   # missing comma between strings
 
     try:
         data = json.loads(cleaned)

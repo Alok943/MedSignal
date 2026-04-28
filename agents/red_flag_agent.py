@@ -348,6 +348,8 @@ def _parse_red_flag_safe(raw: str, prefilled: List[dict]) -> RedFlagOutput:
     # 1. Clean markdown fences and extract text
     raw_text = getattr(raw, "raw", None) or getattr(raw, "output", None) or str(raw)
     cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw_text).strip()
+    cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)   # trailing commas
+    cleaned = re.sub(r'"\s*\n\s*"', '", "', cleaned)   # missing comma between strings
 
     # 2. Safe JSON parse
     try:

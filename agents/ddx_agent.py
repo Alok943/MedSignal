@@ -143,6 +143,8 @@ def build_ddx_task(agent: Agent, structured_input: dict) -> Task:
 def parse_ddx_safe(raw) -> DDxOutput:
     raw_text = getattr(raw, "raw", None) or getattr(raw, "output", None) or str(raw)
     cleaned = re.sub(r"```(?:json)?|```", "", raw_text).strip()
+    cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)   # trailing commas
+    cleaned = re.sub(r'"\s*\n\s*"', '", "', cleaned)   # missing comma between strings
     try:
         return DDxOutput(**json.loads(cleaned))
     except:
